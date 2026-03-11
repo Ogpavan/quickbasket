@@ -86,6 +86,7 @@ const loadProducts = cache(async () => {
 });
 
 const loadWooCategories = cache(async () => fetchWooProductCategories());
+const loadWooProductBySlug = cache(async (slug: string) => fetchWooProductBySlug(slug));
 
 export async function getCategories() {
   if (!isWooCommerceEnabled()) {
@@ -122,7 +123,7 @@ export async function getCategoryBySlug(slug: string) {
     return availableCategories.find((category) => category.slug === slug);
   }
 
-  const allCategories = await fetchWooProductCategories();
+  const allCategories = await loadWooCategories();
   const targetIndex = allCategories.findIndex((category) => category.slug === slug);
 
   if (targetIndex === -1) {
@@ -137,7 +138,7 @@ export async function getAllCategorySlugs() {
     return categories.map((category) => category.slug);
   }
 
-  const allCategories = await fetchWooProductCategories();
+  const allCategories = await loadWooCategories();
   const seen = new Set<string>();
 
   return allCategories
@@ -157,7 +158,7 @@ export async function getSubcategoriesBySlug(slug: string) {
     return [] as SubcategoryItem[];
   }
 
-  const allCategories = await fetchWooProductCategories();
+  const allCategories = await loadWooCategories();
   const currentCategory = allCategories.find((category) => category.slug === slug);
 
   if (!currentCategory) {
@@ -282,7 +283,7 @@ export async function getProductsPage(filters: ProductPageFilters = {}) {
 
 export async function getProductBySlug(slug: string) {
   if (isWooCommerceEnabled()) {
-    return fetchWooProductBySlug(slug);
+    return loadWooProductBySlug(slug);
   }
 
   const products = await loadProducts();
