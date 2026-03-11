@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown, MapPin, ShoppingCart, UserRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { SearchBar } from "@/components/SearchBar";
 import { TopLoadingBar } from "@/components/TopLoadingBar";
@@ -255,7 +255,9 @@ export function Header() {
           </div>
         </div>
       </div>
-      <TopLoadingBar />
+      <Suspense fallback={null}>
+        <TopLoadingBar />
+      </Suspense>
     </header>
   );
 }
