@@ -24,6 +24,14 @@ interface CheckoutFormState {
   notes: string;
 }
 
+interface CouponSummary {
+  code: string;
+  amount: number;
+  discountType: string;
+  individualUse: boolean;
+  hasRestrictions: boolean;
+}
+
 function normalizePhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "");
 
@@ -59,7 +67,49 @@ export function CheckoutPageContent() {
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<CheckoutOrderResult | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponStatus, setCouponStatus] = useState<"idle" | "checking" | "applied" | "error">("idle");
+  const [couponMessage, setCouponMessage] = useState("");
+  const [couponSummary, setCouponSummary] = useState<CouponSummary | null>(null);
+  const [taxRates, setTaxRates] = useState<Record<string, number>>({});
   const totals = useMemo(() => calculateCartTotals(subtotal), [subtotal]);
+  const taxClasses = useMemo(() => {
+    const classes = items.map((item) => item.taxClass || "standard");
+    return Array.from(new Set(classes));
+  }, [items]);
+  const estimatedCouponDiscount = useMemo(() => {
+    if (!couponSummary || couponSummary.hasRestrictions) {
+      return 0;
+    }
+
+    if (couponSummary.discountType === "percent") {
+      return Math.round((subtotal * couponSummary.amount) / 100);
+    }
+
+    if (couponSummary.discountType === "fixed_cart") {
+      return Math.min(couponSummary.amount, subtotal);
+    }
+
+    return 0;
+  }, [couponSummary, subtotal]);
+  const estimatedTax = useMemo(() => {
+    if (taxClasses.length === 0) {
+      return 0;
+    }
+
+    const rawTotal = items.reduce((sum, item) => {
+      const taxClass = item.taxClass || "standard";
+      const rate = taxRates[taxClass] ?? 0;
+      return sum + (item.price * item.quantity * rate) / 100;
+    }, 0);
+
+    return Math.round(rawTotal);
+  }, [items, taxClasses, taxRates]);
+  const handlingFeeTotal = useMemo(() => {
+    return items.reduce((sum, item) => sum + (item.handlingFee ?? 0) * item.quantity, 0);
+  }, [items]);
+  const displayTaxRate =
+    taxClasses.length === 1 ? taxRates[taxClasses[0]] ?? 0 : 0;
 
   useEffect(() => {
     if (!isCartHydrated) {
@@ -82,6 +132,32 @@ export function CheckoutPageContent() {
       window.localStorage.removeItem(CHECKOUT_STORAGE_KEY);
     }
   }, [isCartHydrated]);
+
+  useEffect(() => {
+    if (!isCartHydrated || items.length === 0) {
+      return;
+    }
+
+    const lookupTaxRates = async () => {
+      try {
+        const response = await fetch("/api/tax/rates", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ classes: taxClasses })
+        });
+        const result = (await response.json()) as {
+          rates?: Record<string, number>;
+        };
+        setTaxRates(result.rates ?? {});
+      } catch {
+        setTaxRates({});
+      }
+    };
+
+    lookupTaxRates();
+  }, [isCartHydrated, items.length, taxClasses]);
 
   useEffect(() => {
     if (!isCartHydrated) {
@@ -111,6 +187,67 @@ export function CheckoutPageContent() {
         [field]: event.target.value
       }));
     };
+
+  const handleApplyCoupon = async () => {
+    const trimmed = couponCode.trim();
+    if (!trimmed) {
+      setCouponStatus("error");
+      setCouponMessage("Enter a coupon code first.");
+      return;
+    }
+
+    setCouponStatus("checking");
+    setCouponMessage("");
+
+    try {
+      const response = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ code: trimmed, subtotal })
+      });
+      const result = (await response.json()) as {
+        valid?: boolean;
+        message?: string;
+        coupon?: {
+          code: string;
+          amount: string;
+          discountType: string;
+          individualUse?: boolean;
+          hasRestrictions?: boolean;
+        };
+      };
+
+      if (!response.ok || !result.valid || !result.coupon) {
+        setCouponStatus("error");
+        setCouponSummary(null);
+        setCouponMessage(result.message ?? "Unable to apply this coupon.");
+        return;
+      }
+
+      setCouponStatus("applied");
+      setCouponSummary({
+        code: result.coupon.code,
+        amount: Number(result.coupon.amount || 0),
+        discountType: result.coupon.discountType,
+        individualUse: Boolean(result.coupon.individualUse),
+        hasRestrictions: Boolean(result.coupon.hasRestrictions)
+      });
+      setCouponMessage(result.message ?? "Coupon applied.");
+    } catch {
+      setCouponStatus("error");
+      setCouponSummary(null);
+      setCouponMessage("Unable to validate the coupon right now.");
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode("");
+    setCouponStatus("idle");
+    setCouponMessage("");
+    setCouponSummary(null);
+  };
 
   const handlePlaceOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -151,7 +288,8 @@ export function CheckoutPageContent() {
           postalCode: form.postalCode.trim()
         },
         items,
-        notes: form.notes.trim()
+        notes: form.notes.trim(),
+        couponCode: couponStatus === "applied" && couponCode.trim() ? couponCode.trim() : undefined
       };
       const response = await fetch("/api/checkout", {
         method: "POST",
@@ -304,16 +442,8 @@ export function CheckoutPageContent() {
 
   return (
     <section className="site-container page-section space-y-5">
-      <div className="overflow-hidden rounded-xl bg-gradient-to-br from-brand-yellow via-amber-100 to-white p-5 shadow-card">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Checkout</p>
-        <h1 className="page-title mt-2">Confirm your COD order</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Delivery details and COD confirmation go to WooCommerce with this order. Products stay exactly as they appear in your cart.
-        </p>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
-        <form className="space-y-5" onSubmit={handlePlaceOrder}>
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <form id="checkout-form" className="space-y-5" onSubmit={handlePlaceOrder}>
           <section className="surface-panel p-5">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-mint text-brand-green">
@@ -321,7 +451,7 @@ export function CheckoutPageContent() {
               </span>
               <div>
                 <h2 className="section-title">Customer details</h2>
-                <p className="text-sm text-slate-500">This profile is linked to your WooCommerce customer record.</p>
+                <p className="text-sm text-slate-500">Linked to your WooCommerce customer record.</p>
               </div>
             </div>
 
@@ -368,7 +498,7 @@ export function CheckoutPageContent() {
               </span>
               <div>
                 <h2 className="section-title">Delivery address</h2>
-                <p className="text-sm text-slate-500">This address will be saved on the WooCommerce order.</p>
+                <p className="text-sm text-slate-500">Used for billing and shipping.</p>
               </div>
             </div>
 
@@ -467,13 +597,6 @@ export function CheckoutPageContent() {
 
           {submitError ? <p className="text-sm font-medium text-red-600">{submitError}</p> : null}
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex w-full items-center justify-center rounded-lg bg-brand-green px-6 py-4 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? "Placing COD order..." : "Place COD order"}
-          </button>
         </form>
 
         <aside className="space-y-5">
@@ -483,16 +606,54 @@ export function CheckoutPageContent() {
                 <WalletCards className="h-5 w-5" />
               </span>
               <div>
-                <h2 className="section-title">Payment</h2>
-                <p className="text-sm text-slate-500">Cash on Delivery only</p>
+                <h2 className="section-title">Order summary</h2>
+                <p className="text-sm text-slate-500">Cash on Delivery</p>
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-brand-line bg-amber-50 p-4">
-              <p className="text-sm font-medium text-brand-ink">COD enabled for every order</p>
-              <p className="mt-2 text-xs leading-6 text-slate-600">
-                Orders are saved in WooCommerce with `payment_method = cod` and remain unpaid until delivery.
-              </p>
+            <div className="mt-5 space-y-3 rounded-xl border border-brand-line bg-white p-4">
+              <p className="text-sm font-semibold text-brand-ink">Apply coupon</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(event) => setCouponCode(event.target.value)}
+                  className="h-11 w-full rounded-lg border border-brand-line bg-white px-3 text-sm text-brand-ink placeholder:text-slate-400"
+                  placeholder="Enter coupon code"
+                />
+                {couponStatus === "applied" ? (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="inline-flex h-11 items-center justify-center rounded-lg border border-brand-line px-3 text-xs font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponStatus === "checking"}
+                    className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-green px-4 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {couponStatus === "checking" ? "Applying..." : "Apply"}
+                  </button>
+                )}
+              </div>
+              {couponMessage ? (
+                <p
+                  className={`text-xs ${
+                    couponStatus === "error" ? "text-rose-600" : "text-emerald-600"
+                  }`}
+                >
+                  {couponMessage}
+                </p>
+              ) : null}
+              {couponSummary?.hasRestrictions ? (
+                <p className="text-xs text-slate-500">
+                  This coupon has product or category restrictions. Final discount will be calculated at checkout.
+                </p>
+              ) : null}
             </div>
 
             <div className="mt-5 space-y-4">
@@ -514,6 +675,30 @@ export function CheckoutPageContent() {
                 <span>Subtotal</span>
                 <span className="text-sm font-semibold text-brand-ink">{formatPrice(totals.subtotal)}</span>
               </div>
+              {couponSummary ? (
+                <div className="flex items-center justify-between">
+                  <span>Coupon ({couponSummary.code})</span>
+                  <span className="text-sm font-semibold text-emerald-700">
+                    {estimatedCouponDiscount > 0 ? `- ${formatPrice(estimatedCouponDiscount)}` : "Applied"}
+                  </span>
+                </div>
+              ) : null}
+              {handlingFeeTotal > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span>Handling charge</span>
+                  <span className="text-sm font-semibold text-brand-ink">{formatPrice(handlingFeeTotal)}</span>
+                </div>
+              ) : null}
+              {estimatedTax > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span>
+                    {displayTaxRate > 0 ? `Estimated tax (${displayTaxRate}%)` : "Estimated tax"}
+                  </span>
+                  <span className="text-sm font-semibold text-brand-ink">
+                    {formatPrice(estimatedTax)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span>Delivery fee</span>
                 <span className="text-sm font-semibold text-brand-ink">
@@ -521,34 +706,29 @@ export function CheckoutPageContent() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Payment mode</span>
-                <span className="text-sm font-semibold text-brand-ink">COD</span>
+                <span>Payment</span>
+                <span className="text-sm font-semibold text-brand-ink">Cash on Delivery</span>
               </div>
               <div className="flex items-center justify-between border-t border-dashed border-brand-line pt-3">
                 <span className="text-lg font-bold text-brand-ink">Total payable</span>
-                <span className="text-lg font-bold text-brand-ink">{formatPrice(totals.total)}</span>
+                <span className="text-lg font-bold text-brand-ink">
+                  {formatPrice(
+                    Math.max(totals.total - estimatedCouponDiscount + estimatedTax + handlingFeeTotal, 0)
+                  )}
+                </span>
               </div>
+              <button
+                type="submit"
+                form="checkout-form"
+                disabled={isSubmitting}
+                className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Placing COD order..." : "Place COD order"}
+              </button>
             </div>
           </section>
 
-          <section className="surface-panel p-5">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-mint text-brand-green">
-                <PackageCheck className="h-5 w-5" />
-              </span>
-              <div>
-                <h2 className="section-title">What gets saved</h2>
-                <p className="text-sm text-slate-500">Order data written into WooCommerce</p>
-              </div>
-            </div>
-
-            <ul className="mt-5 space-y-3 text-sm text-slate-600">
-              <li>Customer profile linked by phone-based placeholder email.</li>
-              <li>Billing and shipping address from this form.</li>
-              <li>Line items with quantity, product ID, brand, and pack size metadata.</li>
-              <li>COD payment method and delivery fee.</li>
-            </ul>
-          </section>
+          
         </aside>
       </div>
     </section>

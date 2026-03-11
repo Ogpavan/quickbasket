@@ -20,6 +20,7 @@ export interface CheckoutPayload {
   address: CheckoutAddressPayload;
   items: CartLineItem[];
   notes?: string;
+  couponCode?: string;
 }
 
 export interface CheckoutOrderResult {

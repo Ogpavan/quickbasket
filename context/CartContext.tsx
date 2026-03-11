@@ -108,7 +108,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           price: product.price,
           weight,
           quantity: nextQuantity,
-          stock: product.stock
+          stock: product.stock,
+          taxClass: product.taxClass,
+          handlingFee: product.handlingFee ?? 0
         });
       });
     });
@@ -139,7 +141,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
           price: product.price,
           weight,
           quantity: nextQuantity,
-          stock: product.stock
+          stock: product.stock,
+          taxClass: product.taxClass,
+          handlingFee: product.handlingFee ?? 0
         });
       });
     });

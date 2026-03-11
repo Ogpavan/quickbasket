@@ -20,6 +20,11 @@ interface WooAttribute {
   options: string[];
 }
 
+interface WooMetaData {
+  key: string;
+  value: string | number | boolean | null;
+}
+
 export interface WooProduct {
   id: number;
   name: string;
@@ -34,6 +39,8 @@ export interface WooProduct {
   weight?: string;
   stock_quantity?: number;
   stock_status?: string;
+  tax_class?: string;
+  meta_data?: WooMetaData[];
   images: WooImage[];
   categories: WooTerm[];
   brands?: WooTerm[];
@@ -71,6 +78,17 @@ interface WooOrderShippingLinePayload {
   total: string;
 }
 
+interface WooOrderCouponLinePayload {
+  code: string;
+}
+
+interface WooOrderFeeLinePayload {
+  name: string;
+  total: string;
+  tax_class?: string;
+  taxable?: boolean;
+}
+
 interface WooOrderAddressPayload {
   first_name: string;
   last_name: string;
@@ -101,6 +119,8 @@ interface WooOrderPayload {
   shipping: WooOrderAddressPayload;
   line_items: WooOrderLineItemPayload[];
   shipping_lines?: WooOrderShippingLinePayload[];
+  coupon_lines?: WooOrderCouponLinePayload[];
+  fee_lines?: WooOrderFeeLinePayload[];
   customer_note?: string;
   meta_data?: Array<{
     key: string;
@@ -144,6 +164,34 @@ interface WooOrderLineItem {
 
 export interface WooOrderWithItems extends WooOrderSummary {
   line_items: Array<WooOrderLineItem & { image?: string }>;
+}
+
+export interface WooTaxRate {
+  id: number;
+  rate: string;
+  name: string;
+  country?: string;
+  state?: string;
+  priority?: number;
+  class?: string;
+}
+
+export interface WooCoupon {
+  id: number;
+  code: string;
+  amount: string;
+  discount_type: "percent" | "fixed_cart" | "fixed_product" | string;
+  date_expires?: string | null;
+  usage_limit?: number | null;
+  usage_count?: number | null;
+  minimum_amount?: string;
+  maximum_amount?: string;
+  status?: string;
+  individual_use?: boolean;
+  product_ids?: number[];
+  excluded_product_ids?: number[];
+  product_categories?: number[];
+  excluded_product_categories?: number[];
 }
 
 export async function fetchWooOrdersForCustomer(customerId: number, maxPerPage = 20) {
@@ -196,6 +244,26 @@ export async function fetchWooOrdersForCustomerWithItems(customerId: number, max
         ""
     }))
   })) as WooOrderWithItems[];
+}
+
+export async function fetchWooTaxRatesByClass(taxClass: string) {
+  const normalized = taxClass.trim() || "standard";
+  return wcFetch<WooTaxRate[]>(`taxes?class=${encodeURIComponent(normalized)}&per_page=100`, {
+    cache: "no-store"
+  });
+}
+
+export async function fetchWooCouponByCode(code: string) {
+  const normalized = code.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const coupons = await wcFetch<WooCoupon[]>(`coupons?code=${encodeURIComponent(normalized)}`, {
+    cache: "no-store"
+  });
+
+  return coupons[0] ?? null;
 }
 
 function getWooConfig() {
@@ -301,6 +369,13 @@ export function mapWooProduct(product: WooProduct): GroceryProduct {
   const weight = extractWeight(product, packSizes);
   const description = cleanText(product.short_description || product.description || product.name);
   const tags = (product.tags ?? []).map((tag) => decodeHtml(tag.name));
+  const handlingFeeRaw = product.meta_data?.find((meta) => meta.key === "handling_fee")?.value;
+  const handlingFee =
+    typeof handlingFeeRaw === "number"
+      ? handlingFeeRaw
+      : handlingFeeRaw
+        ? Number(handlingFeeRaw)
+        : 0;
 
   return {
     id: product.id,
@@ -321,7 +396,9 @@ export function mapWooProduct(product: WooProduct): GroceryProduct {
     tags,
     featured: Boolean(product.featured),
     frequentlyBought: Boolean(product.featured || product.on_sale),
-    dailyEssential: true
+    dailyEssential: true,
+    taxClass: product.tax_class || "standard",
+    handlingFee: Number.isFinite(handlingFee) ? handlingFee : 0
   };
 }
 

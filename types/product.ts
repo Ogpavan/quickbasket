@@ -27,6 +27,8 @@ export interface GroceryProduct {
   frequentlyBought?: boolean;
   dailyEssential?: boolean;
   featured?: boolean;
+  taxClass?: string;
+  handlingFee?: number;
 }
 
 export interface CartLineItem {
@@ -40,4 +42,6 @@ export interface CartLineItem {
   weight: string;
   quantity: number;
   stock: GroceryProduct["stock"];
+  taxClass?: GroceryProduct["taxClass"];
+  handlingFee?: GroceryProduct["handlingFee"];
 }

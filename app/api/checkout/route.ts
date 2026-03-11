@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createWooOrder, splitCustomerName, upsertWooCustomer } from "@/lib/woocommerce";
+import { createWooOrder, fetchWooCouponByCode, splitCustomerName, upsertWooCustomer } from "@/lib/woocommerce";
 import { calculateCartTotals } from "@/lib/utils";
 import { CheckoutPayload } from "@/types/checkout";
 
@@ -21,6 +21,11 @@ function toMoney(value: number) {
   return value.toFixed(2);
 }
 
+function toNumber(value?: string) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function joinParts(parts: Array<string | undefined>) {
   return parts.map((part) => part?.trim()).filter(Boolean).join(", ");
 }
@@ -37,6 +42,7 @@ export async function POST(request: NextRequest) {
     const state = payload.address?.state?.trim() ?? "";
     const postalCode = payload.address?.postalCode?.trim() ?? "";
     const notes = payload.notes?.trim() ?? "";
+    const couponCode = payload.couponCode?.trim() ?? "";
     const items = payload.items ?? [];
 
     if (name.length < 2) {
@@ -109,6 +115,34 @@ export async function POST(request: NextRequest) {
             }
           ]
         : [];
+    const handlingFeeTotal = items.reduce((sum, item) => sum + (item.handlingFee ?? 0) * item.quantity, 0);
+
+    if (couponCode) {
+      const coupon = await fetchWooCouponByCode(couponCode);
+      if (!coupon) {
+        return NextResponse.json({ error: "The coupon code is invalid." }, { status: 400 });
+      }
+
+      if (coupon.status && coupon.status !== "publish") {
+        return NextResponse.json({ error: "This coupon is not active." }, { status: 400 });
+      }
+
+      if (coupon.date_expires) {
+        const expiresAt = new Date(coupon.date_expires);
+        if (Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+          return NextResponse.json({ error: "This coupon has expired." }, { status: 400 });
+        }
+      }
+
+      const minimum = toNumber(coupon.minimum_amount);
+      const maximum = toNumber(coupon.maximum_amount);
+      if (minimum > 0 && subtotal < minimum) {
+        return NextResponse.json({ error: `Minimum spend for this coupon is ₹${minimum}.` }, { status: 400 });
+      }
+      if (maximum > 0 && subtotal > maximum) {
+        return NextResponse.json({ error: `Maximum spend for this coupon is ₹${maximum}.` }, { status: 400 });
+      }
+    }
     const order = await createWooOrder({
       payment_method: "cod",
       payment_method_title: "Cash on Delivery",
@@ -139,6 +173,27 @@ export async function POST(request: NextRequest) {
       },
       line_items: lineItems,
       shipping_lines: shippingLines,
+      ...(handlingFeeTotal > 0
+        ? {
+            fee_lines: [
+              {
+                name: "Handling charge",
+                total: toMoney(handlingFeeTotal),
+                tax_class: "",
+                taxable: false
+              }
+            ]
+          }
+        : {}),
+      ...(couponCode
+        ? {
+            coupon_lines: [
+              {
+                code: couponCode
+              }
+            ]
+          }
+        : {}),
       customer_note: notes,
       meta_data: [
         {
