@@ -143,7 +143,7 @@ export function Header() {
                         E-Gift Cards
                       </Link>
                       <Link href="/faq" className="block rounded-lg px-3 py-2 hover:bg-slate-50">
-                        FAQ's
+                        FAQs
                       </Link>
                       <Link href="/account/privacy" className="block rounded-lg px-3 py-2 hover:bg-slate-50">
                         Account Privacy

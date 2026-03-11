@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { CalendarCheck, PackageCheck, WalletCards } from "lucide-react";
 import { format } from "date-fns";
@@ -128,12 +129,14 @@ export function AccountOrdersPane() {
                   <div className="mt-3 flex items-center gap-2">
                     <div className="flex -space-x-2">
                       {thumbnails.map((item) => (
-                        <img
+                        <Image
                           key={item.id}
-                          src={item.image}
+                          src={item.image as string}
                           alt={item.name}
+                          width={40}
+                          height={40}
                           className="h-10 w-10 rounded-lg border border-white object-cover shadow-sm"
-                          loading="lazy"
+                          sizes="40px"
                         />
                       ))}
                     </div>
