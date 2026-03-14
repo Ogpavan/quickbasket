@@ -2,6 +2,7 @@ import { cache } from "react";
 
 import { categories } from "@/data/categories";
 import { groceryProducts } from "@/data/groceryProducts";
+import { getStoreIdFromCookies } from "@/lib/store-id";
 import {
   fetchWooProductBySlug,
   fetchWooProductCategories,
@@ -30,6 +31,13 @@ export interface SubcategoryItem {
   name: string;
   slug: string;
   image: string;
+}
+
+export interface CategoryPreviewSection {
+  slug: string;
+  name: string;
+  href: string;
+  products: GroceryProduct[];
 }
 
 interface ProductFilters {
@@ -77,16 +85,18 @@ function isWooCommerceEnabled() {
   return process.env.CATALOG_SOURCE === "woocommerce";
 }
 
-const loadProducts = cache(async () => {
+const loadProducts = cache(async (storeId?: number) => {
   if (isWooCommerceEnabled()) {
-    return fetchWooProducts();
+    return fetchWooProducts(storeId);
   }
 
   return groceryProducts;
 });
 
 const loadWooCategories = cache(async () => fetchWooProductCategories());
-const loadWooProductBySlug = cache(async (slug: string) => fetchWooProductBySlug(slug));
+const loadWooProductBySlug = cache(async (slug: string, storeId?: number) =>
+  fetchWooProductBySlug(slug, storeId)
+);
 
 export async function getCategories() {
   if (!isWooCommerceEnabled()) {
@@ -192,6 +202,7 @@ function mapWooCategory(category: { name: string; slug: string; image?: { src?: 
 }
 
 export async function getProducts(filters: ProductFilters = {}) {
+  const storeId = getStoreIdFromCookies();
   if (isWooCommerceEnabled() && filters.categorySlug) {
     const categories = await loadWooCategories();
     const category = categories.find((candidate) => candidate.slug === filters.categorySlug);
@@ -200,7 +211,7 @@ export async function getProducts(filters: ProductFilters = {}) {
       return [];
     }
 
-    const products = await fetchWooProductsByCategoryId(category.id);
+    const products = await fetchWooProductsByCategoryId(category.id, 100, storeId);
 
     return products.filter((product) => {
       const brandMatches = !filters.brand || product.brand === filters.brand;
@@ -212,7 +223,7 @@ export async function getProducts(filters: ProductFilters = {}) {
     });
   }
 
-  const products = await loadProducts();
+  const products = await loadProducts(storeId);
 
   return products.filter((product) => {
     const categoryMatches =
@@ -231,6 +242,7 @@ export async function getProducts(filters: ProductFilters = {}) {
 export async function getProductsPage(filters: ProductPageFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const perPage = Math.max(1, filters.perPage ?? 24);
+  const storeId = getStoreIdFromCookies();
 
   if (isWooCommerceEnabled()) {
     let categoryId: number | undefined;
@@ -250,7 +262,8 @@ export async function getProductsPage(filters: ProductPageFilters = {}) {
       page,
       perPage,
       search: filters.search,
-      categoryId
+      categoryId,
+      storeId
     });
 
     return products.filter((product) => {
@@ -263,7 +276,7 @@ export async function getProductsPage(filters: ProductPageFilters = {}) {
     });
   }
 
-  const products = await loadProducts();
+  const products = await loadProducts(storeId);
   const filtered = products.filter((product) => {
     const categoryMatches =
       !filters.categorySlug ||
@@ -283,22 +296,28 @@ export async function getProductsPage(filters: ProductPageFilters = {}) {
 
 export async function getProductBySlug(slug: string) {
   if (isWooCommerceEnabled()) {
-    return loadWooProductBySlug(slug);
+    const storeId = getStoreIdFromCookies();
+    return loadWooProductBySlug(slug, storeId);
   }
 
-  const products = await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = await loadProducts(storeId);
   return products.find((product) => product.slug === slug);
 }
 
 export async function getFrequentlyBoughtProducts(limit = 10) {
-  const products = await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = await loadProducts(storeId);
   const featuredProducts = products.filter((product) => product.frequentlyBought);
 
   return (featuredProducts.length > 0 ? featuredProducts : products).slice(0, limit);
 }
 
 export async function getDailyEssentialProducts(limit = 12) {
-  const products = isWooCommerceEnabled() ? await fetchWooProductsByTag(DAILY_TAG) : await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = isWooCommerceEnabled()
+    ? await fetchWooProductsByTag(DAILY_TAG, 100, storeId)
+    : await loadProducts(storeId);
   const essentials = isWooCommerceEnabled()
     ? products
     : products.filter((product) => product.tags?.some((tag) => tag.toLowerCase() === DAILY_TAG));
@@ -307,7 +326,8 @@ export async function getDailyEssentialProducts(limit = 12) {
 }
 
 export async function getRelatedProducts(product: GroceryProduct, limit = 6) {
-  const products = await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = await loadProducts(storeId);
   const sameCategory = products.filter(
     (candidate) => candidate.categorySlug === product.categorySlug && candidate.id !== product.id
   );
@@ -335,9 +355,12 @@ function buildHeroSlide(product: GroceryProduct, theme: string): HeroSlide {
 }
 
 export async function getHeroSlides(limit = 3) {
+  const storeId = getStoreIdFromCookies();
   const [categories, products] = await Promise.all([
     getCategories(),
-    isWooCommerceEnabled() ? fetchWooProductsByTag(COMMERCIAL_TAG) : loadProducts()
+    isWooCommerceEnabled()
+      ? fetchWooProductsByTag(COMMERCIAL_TAG, 100, storeId)
+      : loadProducts(storeId)
   ]);
   const themeByCategory = new Map(categories.map((category) => [category.slug, category.theme]));
   const commercial = isWooCommerceEnabled()
@@ -394,7 +417,10 @@ export async function getHeroSlides(limit = 3) {
 }
 
 export async function getOfferItems(limit = 12) {
-  const products = isWooCommerceEnabled() ? await fetchWooProductsByTag(OFFER_TAG) : await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = isWooCommerceEnabled()
+    ? await fetchWooProductsByTag(OFFER_TAG, 100, storeId)
+    : await loadProducts(storeId);
   const offers = isWooCommerceEnabled()
     ? products
     : products.filter((product) => product.tags?.some((tag) => tag.toLowerCase() === OFFER_TAG));
@@ -417,7 +443,10 @@ export async function getOfferItems(limit = 12) {
 }
 
 export async function getPopularProducts(limit = 10) {
-  const products = isWooCommerceEnabled() ? await fetchWooProductsByTag(POPULAR_TAG) : await loadProducts();
+  const storeId = getStoreIdFromCookies();
+  const products = isWooCommerceEnabled()
+    ? await fetchWooProductsByTag(POPULAR_TAG, 100, storeId)
+    : await loadProducts(storeId);
   const popular = isWooCommerceEnabled()
     ? products
     : products.filter((product) => product.tags?.some((tag) => tag.toLowerCase() === POPULAR_TAG));
@@ -438,4 +467,45 @@ export async function getCategoryFilters(categorySlug: string, search = "") {
     dietTypes: Array.from(new Set(products.map((product) => product.dietType))),
     maxPrice: Math.max(...products.map((product) => product.price), 0)
   };
+}
+
+export async function getCategoryPreviewSections(
+  slugs: string[],
+  options: {
+    perSection?: number;
+    maxSections?: number;
+  } = {}
+) {
+  const uniqueSlugs = Array.from(new Set(slugs.filter(Boolean)));
+  const maxSections = Math.max(1, options.maxSections ?? 5);
+  const perSection = Math.max(1, options.perSection ?? 10);
+
+  const sections = await Promise.all(
+    uniqueSlugs.slice(0, maxSections).map(async (slug) => {
+      const category = await getCategoryBySlug(slug);
+
+      if (!category) {
+        return null;
+      }
+
+      const products = (await getProductsPage({
+        categorySlug: slug === "all" ? undefined : slug,
+        page: 1,
+        perPage: perSection
+      })).filter((product) => product.hasImage !== false);
+
+      if (products.length === 0) {
+        return null;
+      }
+
+      return {
+        slug: category.slug,
+        name: category.name,
+        href: `/category/${category.slug}`,
+        products
+      } satisfies CategoryPreviewSection;
+    })
+  );
+
+  return sections.filter((section): section is CategoryPreviewSection => Boolean(section));
 }

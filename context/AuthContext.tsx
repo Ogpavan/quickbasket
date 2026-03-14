@@ -13,18 +13,18 @@ type AuthIntent = "account" | "checkout";
 
 interface AuthContextValue {
   user: AuthUser | null;
+  token: string | null;
   isHydrated: boolean;
   isAuthOpen: boolean;
   authIntent: AuthIntent;
-  masterOtp: string;
   openAuth: (intent?: AuthIntent) => void;
   closeAuth: () => void;
-  login: (user: AuthUser) => void;
+  login: (user: AuthUser, token?: string | null) => void;
   logout: () => void;
 }
 
 const STORAGE_KEY = "quickbasket-user";
-const DEFAULT_MASTER_OTP = process.env.NEXT_PUBLIC_MASTER_OTP ?? "123456";
+const TOKEN_KEY = "quickbasket-token";
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -42,12 +42,14 @@ function isStoredUser(value: unknown): value is AuthUser {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authIntent, setAuthIntent] = useState<AuthIntent>("account");
 
   useEffect(() => {
     const storedUser = window.localStorage.getItem(STORAGE_KEY);
+    const storedToken = window.localStorage.getItem(TOKEN_KEY);
 
     if (storedUser) {
       try {
@@ -63,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    if (storedToken) {
+      setToken(storedToken);
+    }
+
     setIsHydrated(true);
   }, []);
 
@@ -73,11 +79,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!user) {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
       return;
     }
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  }, [isHydrated, user]);
+    if (token) {
+      window.localStorage.setItem(TOKEN_KEY, token);
+    }
+  }, [isHydrated, token, user]);
 
   const openAuth = (intent: AuthIntent = "account") => {
     setAuthIntent(intent);
@@ -89,14 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthIntent("account");
   };
 
-  const login = (nextUser: AuthUser) => {
+  const login = (nextUser: AuthUser, nextToken: string | null = null) => {
     setUser(nextUser);
+    setToken(nextToken);
     setIsAuthOpen(false);
     setAuthIntent("account");
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     setIsAuthOpen(false);
     setAuthIntent("account");
   };
@@ -105,10 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        token,
         isHydrated,
         isAuthOpen,
         authIntent,
-        masterOtp: DEFAULT_MASTER_OTP,
         openAuth,
         closeAuth,
         login,

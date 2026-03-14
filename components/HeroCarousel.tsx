@@ -76,7 +76,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
   return (
     <section className="site-container page-section pt-3">
       <div
-        className="relative overflow-hidden rounded-2xl border border-brand-line bg-white/80 shadow-card"
+        className="relative overflow-hidden rounded-md border border-brand-line bg-white shadow-card"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onFocus={() => setIsPaused(true)}
@@ -109,7 +109,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           ))}
         </div>
 
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/80 px-3 py-2 shadow-sm">
+        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/90 px-3 py-2 shadow-card">
           {slides.map((slide, index) => (
             <button
               key={slide.title}
@@ -117,7 +117,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
               onClick={() => goToSlide(index)}
               className={cn(
                 "h-2.5 w-2.5 rounded-full transition-all duration-300",
-                index === activeIndex ? "bg-brand-green scale-110" : "bg-brand-line"
+                index === activeIndex ? "bg-brand-yellow scale-110" : "bg-brand-line"
               )}
               aria-label={`Go to slide ${index + 1}`}
             />
@@ -128,7 +128,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           <button
             type="button"
             onClick={goPrevious}
-            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-line bg-white/90 text-brand-ink shadow-sm transition hover:border-brand-green hover:text-brand-green"
+            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow hover:text-brand-ink"
             aria-label="Previous slide"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -136,7 +136,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
           <button
             type="button"
             onClick={goNext}
-            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-line bg-white/90 text-brand-ink shadow-sm transition hover:border-brand-green hover:text-brand-green"
+            className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow hover:text-brand-ink"
             aria-label="Next slide"
           >
             <ChevronRight className="h-5 w-5" />

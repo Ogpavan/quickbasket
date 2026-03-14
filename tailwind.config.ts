@@ -12,22 +12,29 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          yellow: "#ffd54a",
-          yellowDeep: "#f5c400",
+          yellow: "#F7C600",
+          yellowDeep: "#E6B800",
           green: "#1f8f4d",
-          mint: "#eef9e6",
-          cream: "#fffdf6",
-          ink: "#1b2d1f",
-          line: "#e7eadb",
-          soft: "#fff7cf"
+          mint: "#F1F8EE",
+          cream: "#F7F7F7",
+          ink: "#111111",
+          line: "#E6E6E6",
+          soft: "#FFF5C2",
+          muted: "#6B6B6B"
         }
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"]
+        sans: ["var(--font-inter)", "var(--font-poppins)", "system-ui", "sans-serif"]
+      },
+      borderRadius: {
+        sm: "12px",
+        md: "16px",
+        lg: "24px",
+        xl: "32px"
       },
       boxShadow: {
-        card: "0 16px 40px -28px rgba(27, 45, 31, 0.28)",
-        float: "0 24px 60px -34px rgba(27, 45, 31, 0.35)"
+        card: "0 2px 8px rgba(0, 0, 0, 0.08)",
+        float: "0 10px 24px rgba(0, 0, 0, 0.12)"
       },
       keyframes: {
         "fade-in-up": {

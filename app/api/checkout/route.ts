@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
     });
     const { firstName, lastName } = splitCustomerName(name);
     const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
-    const totals = calculateCartTotals(subtotal);
+    const totals = calculateCartTotals(subtotal, {
+      distanceKm: payload.delivery?.distanceKm,
+      feeConfig: payload.delivery?.feeConfig
+    });
     const addressLine2Combined = joinParts([addressLine2, landmark]);
     const lineItems = items.map((item) => ({
       product_id: item.productId,
@@ -115,7 +118,30 @@ export async function POST(request: NextRequest) {
             }
           ]
         : [];
+    const fixedHandlingFee = totals.handlingFee;
     const handlingFeeTotal = items.reduce((sum, item) => sum + (item.handlingFee ?? 0) * item.quantity, 0);
+    const feeLines = [
+      ...(fixedHandlingFee > 0
+        ? [
+            {
+              name: "Handling charge",
+              total: toMoney(fixedHandlingFee),
+              tax_class: "",
+              taxable: false
+            }
+          ]
+        : []),
+      ...(handlingFeeTotal > 0
+        ? [
+            {
+              name: "Item handling charge",
+              total: toMoney(handlingFeeTotal),
+              tax_class: "",
+              taxable: false
+            }
+          ]
+        : [])
+    ];
 
     if (couponCode) {
       const coupon = await fetchWooCouponByCode(couponCode);
@@ -173,16 +199,9 @@ export async function POST(request: NextRequest) {
       },
       line_items: lineItems,
       shipping_lines: shippingLines,
-      ...(handlingFeeTotal > 0
+      ...(feeLines.length > 0
         ? {
-            fee_lines: [
-              {
-                name: "Handling charge",
-                total: toMoney(handlingFeeTotal),
-                tax_class: "",
-                taxable: false
-              }
-            ]
+            fee_lines: feeLines
           }
         : {}),
       ...(couponCode
@@ -215,7 +234,7 @@ export async function POST(request: NextRequest) {
       order: {
         id: order.id,
         status: order.status,
-        total: Number(order.total || totals.total),
+        total: Number(order.total || totals.total + handlingFeeTotal),
         paymentMethod: "Cash on Delivery",
         customerName: joinParts([firstName, lastName]) || name,
         phone,

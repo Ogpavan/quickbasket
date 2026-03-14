@@ -11,7 +11,7 @@ interface CartContextValue {
   subtotal: number;
   isHydrated: boolean;
   isCartOpen: boolean;
-  addToCart: (product: GroceryProduct, weight?: string, quantity?: number) => void;
+  addToCart: (product: GroceryProduct, weight?: string, quantity?: number, animation?: CartFlyPayload) => void;
   setItemQuantity: (product: GroceryProduct, weight: string, quantity: number) => void;
   getItemQuantity: (productId: number, weight: string) => number;
   removeFromCart: (lineId: string) => void;
@@ -20,11 +20,25 @@ interface CartContextValue {
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
+  flyItems: CartFlyItem[];
 }
 
 const STORAGE_KEY = "quickbasket-cart";
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
+
+interface CartFlyPayload {
+  image: string;
+  from: {
+    x: number;
+    y: number;
+    size: number;
+  };
+}
+
+interface CartFlyItem extends CartFlyPayload {
+  id: string;
+}
 
 function buildLineId(productId: number, weight: string) {
   return `${productId}-${weight.toLowerCase()}`;
@@ -34,6 +48,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [flyItems, setFlyItems] = useState<CartFlyItem[]>([]);
 
   useEffect(() => {
     const storedCart = window.localStorage.getItem(STORAGE_KEY);
@@ -116,7 +131,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const addToCart = (product: GroceryProduct, weight = product.weight, quantity = 1) => {
+  const addToCart = (product: GroceryProduct, weight = product.weight, quantity = 1, animation?: CartFlyPayload) => {
+    if (animation) {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      setFlyItems((currentItems) => currentItems.concat({ id, ...animation }));
+      window.setTimeout(() => {
+        setFlyItems((currentItems) => currentItems.filter((item) => item.id !== id));
+      }, 900);
+    }
+
     startTransition(() => {
       setItems((currentItems) => {
         const lineId = buildLineId(product.id, weight);
@@ -182,7 +205,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         openCart,
         closeCart,
-        toggleCart
+        toggleCart,
+        flyItems
       }}
     >
       {children}

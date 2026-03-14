@@ -50,8 +50,13 @@ The single WooCommerce products request is reused across the app:
 ### 2. Internal OTP Verification API
 
 - Method: `POST`
+- Endpoint: `/api/auth/send-otp`
+- Purpose: generates an OTP, stores the OTP challenge and rate-limit records in the WordPress database, and sends the SMS
+- Source file: `app/api/auth/send-otp/route.ts`
+
+- Method: `POST`
 - Endpoint: `/api/auth/verify-otp`
-- Purpose: verifies the master OTP and syncs the signed-in user into WooCommerce as a customer
+- Purpose: verifies the submitted OTP against the WordPress-backed OTP tables and syncs the signed-in user into WooCommerce as a customer
 - Source file: `app/api/auth/verify-otp/route.ts`
 
 ### 3. WooCommerce Customers API
@@ -120,9 +125,12 @@ File: `lib/catalog.ts`
 
 ### Auth write layer
 
-File: `app/api/auth/verify-otp/route.ts`
+Files: `app/api/auth/send-otp/route.ts`, `app/api/auth/verify-otp/route.ts`, `lib/server/otp.ts`
 
-- Validates `name`, `phone`, and the master OTP
+- Validates `name`, `phone`, and the OTP request ID / submitted OTP
+- Creates the OTP challenge and rate-limit tables directly in the WordPress MySQL database if they do not already exist
+- Stores OTP hashes and rate-limit events in WordPress database tables prefixed with your WP table prefix
+- Sends the real OTP through the configured SMS gateway
 - Generates a placeholder email in the format `{phone}@quickbasket.local`
 - Creates or updates the WooCommerce customer
 - Returns the stored customer payload back to the frontend auth context
@@ -150,8 +158,31 @@ CATALOG_SOURCE=woocommerce
 WORDPRESS_URL=https://ecommerce.efoxtechnologies.com/
 WC_CONSUMER_KEY=...
 WC_CONSUMER_SECRET=...
-AUTH_MASTER_OTP=123456
-NEXT_PUBLIC_MASTER_OTP=123456
+WORDPRESS_DB_HOST=...
+WORDPRESS_DB_PORT=3306
+WORDPRESS_DB_NAME=...
+WORDPRESS_DB_USER=...
+WORDPRESS_DB_PASSWORD=...
+WORDPRESS_DB_PREFIX=wp_
+OTP_HASH_SECRET=...
+OTP_LENGTH=4
+OTP_TTL_SECONDS=120
+OTP_SEND_COOLDOWN_SECONDS=30
+OTP_MAX_ATTEMPTS_PER_CHALLENGE=5
+OTP_SEND_LIMIT_PER_PHONE_WINDOW=3
+OTP_SEND_LIMIT_WINDOW_SECONDS=900
+OTP_SEND_LIMIT_PER_IP_WINDOW=10
+OTP_SEND_IP_LIMIT_WINDOW_SECONDS=3600
+OTP_VERIFY_LIMIT_PER_PHONE_WINDOW=8
+OTP_VERIFY_LIMIT_WINDOW_SECONDS=900
+OTP_VERIFY_LIMIT_PER_IP_WINDOW=20
+OTP_VERIFY_IP_LIMIT_WINDOW_SECONDS=3600
+SMS_GATEWAY_URL=...
+SMS_AUTH_KEY=...
+SMS_SENDER_ID=...
+SMS_ROUTE_ID=1
+SMS_CONTENT_TYPE=english
+SMS_OTP_MESSAGE_TEMPLATE={otp} is your One-Time Password...
 NEXT_PUBLIC_STORE_CURRENCY=INR
 NEXT_PUBLIC_STORE_LOCALE=en-IN
 ```

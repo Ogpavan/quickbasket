@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createAuthToken } from "@/lib/server/auth";
+import { OtpServiceError, verifyOtpChallenge } from "@/lib/server/otp";
 import { upsertWooCustomer } from "@/lib/woocommerce";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +22,14 @@ function resolveDisplayName(firstName: string, lastName: string, fallbackName: s
   return fullName || fallbackName;
 }
 
-function getMasterOtp() {
-  return process.env.AUTH_MASTER_OTP ?? process.env.NEXT_PUBLIC_MASTER_OTP ?? "123456";
+function getClientIpAddress(request: NextRequest) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() ?? null;
+  }
+
+  return request.headers.get("x-real-ip")?.trim() ?? null;
 }
 
 export async function POST(request: NextRequest) {
@@ -30,38 +38,55 @@ export async function POST(request: NextRequest) {
       name?: string;
       phone?: string;
       otp?: string;
+      requestId?: string;
     };
 
-    const name = payload.name?.trim() ?? "";
     const phone = normalizePhoneNumber(payload.phone ?? "");
     const otp = payload.otp?.trim() ?? "";
-
-    if (name.length < 2) {
-      return NextResponse.json({ error: "Enter a valid name." }, { status: 400 });
-    }
+    const requestId = payload.requestId?.trim() ?? "";
 
     if (phone.length !== 10) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
     }
 
-    if (otp !== getMasterOtp()) {
-      return NextResponse.json({ error: "Invalid OTP." }, { status: 401 });
+    if (!requestId) {
+      return NextResponse.json({ error: "OTP request ID is missing. Please request a new OTP." }, { status: 400 });
     }
 
-    const customer = await upsertWooCustomer({
-      name,
-      phone
+    const verifiedChallenge = await verifyOtpChallenge({
+      requestId,
+      phone,
+      otp,
+      ipAddress: getClientIpAddress(request)
     });
 
+    const customer = await upsertWooCustomer({
+      name: verifiedChallenge.name,
+      phone: verifiedChallenge.phone
+    });
+
+    const user = {
+      id: customer.id,
+      name: resolveDisplayName(customer.first_name, customer.last_name, verifiedChallenge.name),
+      phone: customer.billing?.phone ?? verifiedChallenge.phone,
+      email: customer.email
+    };
+
     return NextResponse.json({
-      user: {
-        id: customer.id,
-        name: resolveDisplayName(customer.first_name, customer.last_name, name),
-        phone: customer.billing?.phone ?? phone,
-        email: customer.email
-      }
+      user,
+      token: createAuthToken(user.id, user.phone)
     });
   } catch (error) {
+    if (error instanceof OtpServiceError) {
+      const response = NextResponse.json({ error: error.message }, { status: error.status });
+
+      if (typeof error.retryAfterSeconds === "number") {
+        response.headers.set("Retry-After", error.retryAfterSeconds.toString());
+      }
+
+      return response;
+    }
+
     console.error("OTP verification route failed", error);
 
     return NextResponse.json(

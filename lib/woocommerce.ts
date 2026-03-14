@@ -144,7 +144,16 @@ interface WooOrderSummary {
   status: string;
   total: string;
   payment_method: string;
+  payment_method_title?: string;
   date_created: string;
+  date_paid?: string | null;
+  date_completed?: string | null;
+  discount_total?: string;
+  shipping_total?: string;
+  total_tax?: string;
+  currency?: string;
+  billing?: WooOrderAddressPayload;
+  shipping?: WooOrderAddressPayload;
 }
 
 interface WooOrderLineItem {
@@ -153,6 +162,8 @@ interface WooOrderLineItem {
   name: string;
   quantity: number;
   total: string;
+  subtotal?: string;
+  price?: number;
   image?: {
     src?: string;
   };
@@ -196,11 +207,12 @@ export interface WooCoupon {
 
 export async function fetchWooOrdersForCustomer(customerId: number, maxPerPage = 20) {
   return wcFetch<WooOrderSummary[]>(
-    `orders?customer=${customerId}&per_page=${maxPerPage}&status=any&order=desc`
+    `orders?customer=${customerId}&per_page=${maxPerPage}&status=any&order=desc`,
+    { cache: "no-store" }
   );
 }
 
-async function fetchWooProductsByIds(ids: number[]) {
+async function fetchWooProductsByIds(ids: number[], storeId?: number) {
   const unique = Array.from(new Set(ids)).filter((id) => Number.isFinite(id) && id > 0);
   if (unique.length === 0) {
     return [] as WooProduct[];
@@ -212,11 +224,16 @@ async function fetchWooProductsByIds(ids: number[]) {
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
     const products = await wcFetch<WooProduct[]>(
-      `products?${buildQueryString({
-        include: chunk.join(","),
-        per_page: chunk.length,
-        status: "publish"
-      })}`
+      `products?${buildQueryString(
+        withStoreId(
+          {
+            include: chunk.join(","),
+            per_page: chunk.length,
+            status: "publish"
+          },
+          storeId
+        )
+      )}`
     );
     batches.push(...products);
   }
@@ -226,24 +243,35 @@ async function fetchWooProductsByIds(ids: number[]) {
 
 export async function fetchWooOrdersForCustomerWithItems(customerId: number, maxPerPage = 20) {
   const orders = await wcFetch<Array<WooOrderSummary & { line_items: WooOrderLineItem[] }>>(
-    `orders?customer=${customerId}&per_page=${maxPerPage}&status=any&order=desc`
+    `orders?customer=${customerId}&per_page=${maxPerPage}&status=any&order=desc`,
+    { cache: "no-store" }
   );
 
-  const productIds = orders.flatMap((order) => order.line_items?.map((item) => item.product_id) ?? []);
-  const products = await fetchWooProductsByIds(productIds);
-  const imageById = new Map(products.map((product) => [product.id, getImage(product.images ?? [])]));
+  return mapOrdersWithImages(orders);
+}
 
-  return orders.map((order) => ({
-    ...order,
-    line_items: (order.line_items ?? []).map((item) => ({
-      ...item,
-      image:
-        item.image?.src ||
-        item.meta_data?.find((meta) => meta.key.toLowerCase() === "image")?.value ||
-        imageById.get(item.product_id) ||
-        ""
-    }))
-  })) as WooOrderWithItems[];
+export async function fetchWooOrdersWithItems(maxPerPage = 50) {
+  const orders = await wcFetch<Array<WooOrderSummary & { line_items: WooOrderLineItem[] }>>(
+    `orders?per_page=${maxPerPage}&status=any&order=desc`,
+    { cache: "no-store" }
+  );
+
+  return mapOrdersWithImages(orders);
+}
+
+export async function fetchWooOrdersPageWithItems({
+  page = 1,
+  perPage = 100
+}: {
+  page?: number;
+  perPage?: number;
+}) {
+  const orders = await wcFetch<Array<WooOrderSummary & { line_items: WooOrderLineItem[] }>>(
+    `orders?per_page=${perPage}&page=${page}&status=any&order=desc`,
+    { cache: "no-store" }
+  );
+
+  return mapOrdersWithImages(orders);
 }
 
 export async function fetchWooTaxRatesByClass(taxClass: string) {
@@ -289,6 +317,20 @@ function buildQueryString(params: Record<string, string | number | undefined>) {
     .join("&");
 }
 
+function withStoreId(
+  params: Record<string, string | number | undefined>,
+  storeId?: number
+) {
+  if (typeof storeId === "number" && Number.isFinite(storeId) && storeId > 0) {
+    return {
+      ...params,
+      store_id: storeId
+    };
+  }
+
+  return params;
+}
+
 function decodeHtml(value: string) {
   return value
     .replace(/&nbsp;/g, " ")
@@ -312,6 +354,26 @@ function cleanText(value: string) {
 
 function getImage(images: WooImage[]) {
   return images.find((image) => image.src)?.src ?? DEFAULT_IMAGE;
+}
+
+async function mapOrdersWithImages(
+  orders: Array<WooOrderSummary & { line_items: WooOrderLineItem[] }>
+): Promise<WooOrderWithItems[]> {
+  const productIds = orders.flatMap((order) => order.line_items?.map((item) => item.product_id) ?? []);
+  const products = await fetchWooProductsByIds(productIds);
+  const imageById = new Map(products.map((product) => [product.id, getImage(product.images ?? [])]));
+
+  return orders.map((order) => ({
+    ...order,
+    line_items: (order.line_items ?? []).map((item) => ({
+      ...item,
+      image:
+        item.image?.src ||
+        item.meta_data?.find((meta) => meta.key.toLowerCase() === "image")?.value ||
+        imageById.get(item.product_id) ||
+        ""
+    }))
+  })) as WooOrderWithItems[];
 }
 
 function extractPackSizes(attributes: WooAttribute[]) {
@@ -441,8 +503,12 @@ export async function wcFetch<T>(path: string, init?: RequestInit) {
   return (await response.json()) as T;
 }
 
-export async function fetchWooProducts() {
-  const products = await wcFetch<WooProduct[]>("products?status=publish&per_page=100");
+export async function fetchWooProducts(storeId?: number) {
+  const products = await wcFetch<WooProduct[]>(
+    `products?${buildQueryString(
+      withStoreId({ status: "publish", per_page: 100 }, storeId)
+    )}`
+  );
   return products.map((product) => mapWooProduct(product));
 }
 
@@ -450,12 +516,14 @@ export async function fetchWooProductsPage({
   page = 1,
   perPage = 24,
   search,
-  categoryId
+  categoryId,
+  storeId
 }: {
   page?: number;
   perPage?: number;
   search?: string;
   categoryId?: number;
+  storeId?: number;
 }) {
   const params: Record<string, string | number | undefined> = {
     status: "publish",
@@ -471,11 +539,17 @@ export async function fetchWooProductsPage({
     params.search = search;
   }
 
-  const products = await wcFetch<WooProduct[]>(`products?${buildQueryString(params)}`);
+  const products = await wcFetch<WooProduct[]>(
+    `products?${buildQueryString(withStoreId(params, storeId))}`
+  );
   return products.map((product) => mapWooProduct(product));
 }
 
-export async function fetchWooProductsByCategoryId(categoryId: number, maxPerPage = 100) {
+export async function fetchWooProductsByCategoryId(
+  categoryId: number,
+  maxPerPage = 100,
+  storeId?: number
+) {
   if (!Number.isFinite(categoryId) || categoryId <= 0) {
     return [];
   }
@@ -485,7 +559,12 @@ export async function fetchWooProductsByCategoryId(categoryId: number, maxPerPag
 
   while (true) {
     const batch = await wcFetch<WooProduct[]>(
-      `products?${buildQueryString({ status: "publish", category: categoryId, per_page: maxPerPage, page })}`
+      `products?${buildQueryString(
+        withStoreId(
+          { status: "publish", category: categoryId, per_page: maxPerPage, page },
+          storeId
+        )
+      )}`
     );
 
     if (!Array.isArray(batch) || batch.length === 0) {
@@ -504,13 +583,13 @@ export async function fetchWooProductsByCategoryId(categoryId: number, maxPerPag
   return products.map((product) => mapWooProduct(product));
 }
 
-export async function fetchWooProductBySlug(slug: string) {
+export async function fetchWooProductBySlug(slug: string, storeId?: number) {
   if (!slug.trim()) {
     return null;
   }
 
   const products = await wcFetch<WooProduct[]>(
-    `products?${buildQueryString({ status: "publish", slug })}`
+    `products?${buildQueryString(withStoreId({ status: "publish", slug }, storeId))}`
   );
 
   if (!Array.isArray(products) || products.length === 0) {
@@ -520,7 +599,7 @@ export async function fetchWooProductBySlug(slug: string) {
   return mapWooProduct(products[0]);
 }
 
-export async function fetchWooProductsByTag(tag: string, maxPerPage = 100) {
+export async function fetchWooProductsByTag(tag: string, maxPerPage = 100, storeId?: number) {
   if (!tag.trim()) {
     return [];
   }
@@ -537,7 +616,9 @@ export async function fetchWooProductsByTag(tag: string, maxPerPage = 100) {
   }
 
   const products = await wcFetch<WooProduct[]>(
-    `products?${buildQueryString({ status: "publish", tag: matchedTag.id, per_page: maxPerPage })}`
+    `products?${buildQueryString(
+      withStoreId({ status: "publish", tag: matchedTag.id, per_page: maxPerPage }, storeId)
+    )}`
   );
 
   return products.map((product) => mapWooProduct(product));

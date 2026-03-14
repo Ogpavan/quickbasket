@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.1.8",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.454.0",
+    "mysql2": "^3.19.1",
     "next": "14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

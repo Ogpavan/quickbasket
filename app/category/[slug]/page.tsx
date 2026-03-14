@@ -5,6 +5,8 @@ import { CategoryBrowser } from "@/components/CategoryBrowser";
 import {
   getAllCategorySlugs,
   getCategoryBySlug,
+  getCategoryPreviewSections,
+  getCategories,
   getProductsPage,
   getSubcategoriesBySlug
 } from "@/lib/catalog";
@@ -52,23 +54,34 @@ export default async function CategoryPage({
   }
 
   const search = getSearchValue(searchParams.search);
-  const pageSize = 24;
-  const [products, subcategories] = await Promise.all([
+  const pageSize = 30;
+  const [products, subcategories, categories] = await Promise.all([
     getProductsPage({
       categorySlug: params.slug === "all" ? undefined : params.slug,
       search,
       page: 1,
       perPage: pageSize
     }),
-    getSubcategoriesBySlug(params.slug)
+    getSubcategoriesBySlug(params.slug),
+    getCategories()
   ]);
+  const railCategories = (subcategories.length > 0 ? subcategories : categories).filter((item) => Boolean(item.image));
+  const previewSlugs =
+    params.slug === "all"
+      ? railCategories.map((item) => item.slug)
+      : [...railCategories.map((item) => item.slug).filter((slug) => slug !== params.slug), params.slug];
+  const sections = await getCategoryPreviewSections(previewSlugs, {
+    perSection: 10,
+    maxSections: 5
+  });
 
   return (
     <CategoryBrowser
       category={category}
       products={products}
       search={search}
-      subcategories={subcategories}
+      railCategories={railCategories}
+      sections={sections}
       pageSize={pageSize}
     />
   );

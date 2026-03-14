@@ -6,6 +6,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { useDeliveryPricing } from "@/hooks/useDeliveryPricing";
 import { calculateCartTotals, formatPrice } from "@/lib/utils";
 import { CheckoutOrderResult, CheckoutPayload } from "@/types/checkout";
 
@@ -42,6 +43,21 @@ function normalizePhoneNumber(value: string) {
   return digits;
 }
 
+function sanitizeName(value: string) {
+  return value
+    .replace(/[^A-Za-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .trimStart();
+}
+
+function isValidName(value: string) {
+  return /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(value.trim());
+}
+
+function sanitizePhone(value: string) {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
 function buildPlaceholderEmail(phone: string) {
   const normalizedPhone = normalizePhoneNumber(phone);
   return normalizedPhone ? `${normalizedPhone}@quickbasket.local` : "";
@@ -72,7 +88,11 @@ export function CheckoutPageContent() {
   const [couponMessage, setCouponMessage] = useState("");
   const [couponSummary, setCouponSummary] = useState<CouponSummary | null>(null);
   const [taxRates, setTaxRates] = useState<Record<string, number>>({});
-  const totals = useMemo(() => calculateCartTotals(subtotal), [subtotal]);
+  const { distanceKm, feeConfig } = useDeliveryPricing();
+  const totals = useMemo(
+    () => calculateCartTotals(subtotal, { distanceKm, feeConfig }),
+    [subtotal, distanceKm, feeConfig]
+  );
   const taxClasses = useMemo(() => {
     const classes = items.map((item) => item.taxClass || "standard");
     return Array.from(new Set(classes));
@@ -182,9 +202,15 @@ export function CheckoutPageContent() {
 
   const updateField =
     (field: keyof CheckoutFormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const nextValue =
+        field === "name"
+          ? sanitizeName(event.target.value)
+          : field === "phone"
+            ? sanitizePhone(event.target.value)
+            : event.target.value;
       setForm((currentForm) => ({
         ...currentForm,
-        [field]: event.target.value
+        [field]: nextValue
       }));
     };
 
@@ -254,8 +280,8 @@ export function CheckoutPageContent() {
 
     const normalizedPhone = normalizePhoneNumber(form.phone);
 
-    if (form.name.trim().length < 2) {
-      setSubmitError("Enter the customer's full name.");
+    if (form.name.trim().length < 2 || !isValidName(form.name)) {
+      setSubmitError("Enter a valid full name using alphabets only.");
       return;
     }
 
@@ -286,6 +312,10 @@ export function CheckoutPageContent() {
           city: form.city.trim(),
           state: form.state.trim(),
           postalCode: form.postalCode.trim()
+        },
+        delivery: {
+          distanceKm,
+          feeConfig
         },
         items,
         notes: form.notes.trim(),
@@ -332,7 +362,7 @@ export function CheckoutPageContent() {
     return (
       <section className="site-container page-section space-y-5">
         <div className="surface-panel overflow-hidden bg-gradient-to-br from-brand-mint via-white to-emerald-50 p-6">
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-brand-green text-white">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-md bg-brand-green text-white">
             <CheckCircle2 className="h-6 w-6" />
           </span>
           <h1 className="page-title mt-4">Order placed successfully</h1>
@@ -345,20 +375,20 @@ export function CheckoutPageContent() {
           <div className="surface-panel p-5">
             <h2 className="section-title">Order details</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl bg-brand-mint/50 p-4">
+              <div className="rounded-md bg-brand-mint/50 p-4">
                 <p className="text-xs text-slate-500">Order ID</p>
                 <p className="mt-1 text-lg font-bold text-brand-ink">#{orderResult.id}</p>
               </div>
-              <div className="rounded-xl bg-amber-50 p-4">
+              <div className="rounded-md bg-amber-50 p-4">
                 <p className="text-xs text-slate-500">Payment method</p>
                 <p className="mt-1 text-lg font-bold text-brand-ink">{orderResult.paymentMethod}</p>
               </div>
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-md bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">Customer</p>
                 <p className="mt-1 text-sm font-medium text-brand-ink">{orderResult.customerName}</p>
                 <p className="mt-1 text-xs text-slate-500">{orderResult.phone}</p>
               </div>
-              <div className="rounded-xl bg-slate-50 p-4">
+              <div className="rounded-md bg-slate-50 p-4">
                 <p className="text-xs text-slate-500">Delivery address</p>
                 <p className="mt-1 text-sm font-medium text-brand-ink">{orderResult.addressSummary}</p>
               </div>
@@ -376,7 +406,7 @@ export function CheckoutPageContent() {
                 <span>Total payable</span>
                 <span className="text-lg font-bold text-brand-ink">{formatPrice(orderResult.total)}</span>
               </div>
-              <p className="rounded-xl bg-brand-mint/50 p-4 text-sm leading-6 text-slate-600">
+              <p className="rounded-md bg-brand-mint/50 p-4 text-sm leading-6 text-slate-600">
                 Keep cash ready at delivery. The operations team can now see this order in WooCommerce.
               </p>
             </div>
@@ -384,13 +414,13 @@ export function CheckoutPageContent() {
             <div className="mt-6 space-y-3">
               <Link
                 href="/category/all"
-                className="inline-flex w-full items-center justify-center rounded-lg bg-brand-green px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+                className="inline-flex w-full items-center justify-center rounded-md bg-brand-green px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
               >
                 Continue shopping
               </Link>
               <Link
                 href="/cart"
-                className="inline-flex w-full items-center justify-center rounded-lg border border-brand-line px-5 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
+                className="inline-flex w-full items-center justify-center rounded-md border border-brand-line px-5 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
               >
                 Back to cart
               </Link>
@@ -411,7 +441,7 @@ export function CheckoutPageContent() {
           </p>
           <Link
             href="/category/all"
-            className="mt-8 inline-flex items-center justify-center rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+            className="mt-8 inline-flex items-center justify-center rounded-md bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110"
           >
             Browse groceries
           </Link>
@@ -431,7 +461,7 @@ export function CheckoutPageContent() {
           <button
             type="button"
             onClick={() => openAuth("checkout")}
-            className="mt-8 inline-flex items-center justify-center rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+            className="mt-8 inline-flex items-center justify-center rounded-md bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110"
           >
             Login with phone OTP
           </button>
@@ -446,7 +476,7 @@ export function CheckoutPageContent() {
         <form id="checkout-form" className="space-y-5" onSubmit={handlePlaceOrder}>
           <section className="surface-panel p-5">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-mint text-brand-green">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-brand-mint text-brand-green">
                 <House className="h-5 w-5" />
               </span>
               <div>
@@ -462,7 +492,7 @@ export function CheckoutPageContent() {
                   type="text"
                   value={form.name}
                   onChange={updateField("name")}
-                  className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                  className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                   placeholder="Enter your full name"
                 />
               </label>
@@ -472,7 +502,7 @@ export function CheckoutPageContent() {
                   type="tel"
                   value={form.phone}
                   onChange={updateField("phone")}
-                  className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                  className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                   placeholder="Enter your 10-digit mobile number"
                   inputMode="tel"
                 />
@@ -484,7 +514,7 @@ export function CheckoutPageContent() {
               <input
                 type="email"
                 value={form.email || buildPlaceholderEmail(form.phone)}
-                className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-slate-50 px-4 text-sm text-slate-600"
+                className="mt-2 h-12 w-full rounded-md border border-brand-line bg-slate-50 px-4 text-sm text-slate-600"
                 placeholder="Customer email"
                 readOnly
               />
@@ -493,7 +523,7 @@ export function CheckoutPageContent() {
 
           <section className="surface-panel p-5">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-amber-50 text-amber-700">
                 <MapPinned className="h-5 w-5" />
               </span>
               <div>
@@ -509,7 +539,7 @@ export function CheckoutPageContent() {
                   type="text"
                   value={form.addressLine1}
                   onChange={updateField("addressLine1")}
-                  className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                  className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                   placeholder="House / flat / street"
                 />
               </label>
@@ -521,7 +551,7 @@ export function CheckoutPageContent() {
                     type="text"
                     value={form.addressLine2}
                     onChange={updateField("addressLine2")}
-                    className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                    className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                     placeholder="Area / apartment"
                   />
                 </label>
@@ -531,7 +561,7 @@ export function CheckoutPageContent() {
                     type="text"
                     value={form.landmark}
                     onChange={updateField("landmark")}
-                    className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                    className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                     placeholder="Nearby landmark"
                   />
                 </label>
@@ -544,7 +574,7 @@ export function CheckoutPageContent() {
                     type="text"
                     value={form.city}
                     onChange={updateField("city")}
-                    className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                    className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                     placeholder="City"
                   />
                 </label>
@@ -554,7 +584,7 @@ export function CheckoutPageContent() {
                     type="text"
                     value={form.state}
                     onChange={updateField("state")}
-                    className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                    className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                     placeholder="State"
                   />
                 </label>
@@ -564,7 +594,7 @@ export function CheckoutPageContent() {
                     type="text"
                     value={form.postalCode}
                     onChange={updateField("postalCode")}
-                    className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                    className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                     placeholder="6-digit pincode"
                     inputMode="numeric"
                   />
@@ -575,7 +605,7 @@ export function CheckoutPageContent() {
 
           <section className="surface-panel p-5">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-sky-50 text-sky-700">
                 <NotebookPen className="h-5 w-5" />
               </span>
               <div>
@@ -589,7 +619,7 @@ export function CheckoutPageContent() {
               <textarea
                 value={form.notes}
                 onChange={updateField("notes")}
-                className="mt-2 min-h-28 w-full rounded-lg border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink placeholder:text-slate-400"
+                className="mt-2 min-h-28 w-full rounded-md border border-brand-line bg-white px-4 py-3 text-sm text-brand-ink placeholder:text-slate-400"
                 placeholder="Delivery gate code, floor number, or preferred drop instructions"
               />
             </label>
@@ -602,7 +632,7 @@ export function CheckoutPageContent() {
         <aside className="space-y-5">
           <section className="surface-panel p-5 lg:sticky lg:top-24">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-yellow/80 text-brand-ink">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-brand-yellow/80 text-brand-ink">
                 <WalletCards className="h-5 w-5" />
               </span>
               <div>
@@ -611,21 +641,21 @@ export function CheckoutPageContent() {
               </div>
             </div>
 
-            <div className="mt-5 space-y-3 rounded-xl border border-brand-line bg-white p-4">
+            <div className="mt-5 space-y-3 rounded-md border border-brand-line bg-white p-4">
               <p className="text-sm font-semibold text-brand-ink">Apply coupon</p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={couponCode}
                   onChange={(event) => setCouponCode(event.target.value)}
-                  className="h-11 w-full rounded-lg border border-brand-line bg-white px-3 text-sm text-brand-ink placeholder:text-slate-400"
+                  className="h-11 w-full rounded-md border border-brand-line bg-white px-3 text-sm text-brand-ink placeholder:text-slate-400"
                   placeholder="Enter coupon code"
                 />
                 {couponStatus === "applied" ? (
                   <button
                     type="button"
                     onClick={handleRemoveCoupon}
-                    className="inline-flex h-11 items-center justify-center rounded-lg border border-brand-line px-3 text-xs font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
+                    className="inline-flex h-11 items-center justify-center rounded-md border border-brand-line px-3 text-xs font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
                   >
                     Remove
                   </button>
@@ -634,7 +664,7 @@ export function CheckoutPageContent() {
                     type="button"
                     onClick={handleApplyCoupon}
                     disabled={couponStatus === "checking"}
-                    className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-green px-4 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="inline-flex h-11 items-center justify-center rounded-md bg-brand-green px-4 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {couponStatus === "checking" ? "Applying..." : "Apply"}
                   </button>
@@ -683,9 +713,15 @@ export function CheckoutPageContent() {
                   </span>
                 </div>
               ) : null}
-              {handlingFeeTotal > 0 ? (
+              {totals.handlingFee > 0 ? (
                 <div className="flex items-center justify-between">
                   <span>Handling charge</span>
+                  <span className="text-sm font-semibold text-brand-ink">{formatPrice(totals.handlingFee)}</span>
+                </div>
+              ) : null}
+              {handlingFeeTotal > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span>Item handling charge</span>
                   <span className="text-sm font-semibold text-brand-ink">{formatPrice(handlingFeeTotal)}</span>
                 </div>
               ) : null}
@@ -721,7 +757,7 @@ export function CheckoutPageContent() {
                 type="submit"
                 form="checkout-form"
                 disabled={isSubmitting}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                className="mt-2 inline-flex w-full items-center justify-center rounded-md bg-brand-green px-6 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSubmitting ? "Placing COD order..." : "Place COD order"}
               </button>

@@ -1,3 +1,5 @@
+﻿"use client";
+
 import { AccountOrdersPane } from "@/components/AccountOrdersPane";
 import { AccountShell } from "@/components/AccountShell";
 

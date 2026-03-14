@@ -36,15 +36,20 @@ function maskPhoneNumber(value: string) {
 }
 
 export function AuthModal() {
-  const { user, isAuthOpen, authIntent, masterOtp, closeAuth, login, logout } = useAuth();
+  const { user, isAuthOpen, authIntent, closeAuth, login, logout } = useAuth();
   const [step, setStep] = useState<"details" | "otp">("details");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [submittedName, setSubmittedName] = useState("");
   const [submittedPhone, setSubmittedPhone] = useState("");
+  const [requestId, setRequestId] = useState("");
+  const [otpLength, setOtpLength] = useState(4);
+  const [resendAvailableAt, setResendAvailableAt] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
 
   useEffect(() => {
     if (!isAuthOpen) {
@@ -54,6 +59,12 @@ export function AuthModal() {
       setOtp("");
       setSubmittedName("");
       setSubmittedPhone("");
+      setRequestId("");
+      setOtpLength(4);
+      setResendAvailableAt("");
+      setIsSendingOtp(false);
+      setIsVerifyingOtp(false);
+      setClock(Date.now());
       setErrorMessage("");
       return;
     }
@@ -65,6 +76,15 @@ export function AuthModal() {
       document.body.style.overflow = previousOverflow;
     };
   }, [isAuthOpen]);
+
+  useEffect(() => {
+    if (!isAuthOpen || step !== "otp") {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, [isAuthOpen, step]);
 
   const title = useMemo(() => {
     if (user) {
@@ -84,14 +104,69 @@ export function AuthModal() {
       : "Use your name and mobile number to sign in quickly before ordering groceries.";
   }, [authIntent, user]);
 
-  const handleSendOtp = (event: FormEvent<HTMLFormElement>) => {
+  const resendRemainingSeconds = useMemo(() => {
+    if (!resendAvailableAt) {
+      return 0;
+    }
+
+    const availableAt = new Date(resendAvailableAt).getTime();
+    return Math.max(0, Math.ceil((availableAt - clock) / 1000));
+  }, [clock, resendAvailableAt]);
+
+  const requestOtp = async (nextName: string, nextPhone: string) => {
+    setIsSendingOtp(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: nextName,
+          phone: nextPhone
+        })
+      });
+
+      const result = (await response.json()) as {
+        error?: string;
+        requestId?: string;
+        otpLength?: number;
+        resendAvailableAt?: string;
+      };
+
+      if (!response.ok || !result.requestId) {
+        setErrorMessage(result.error ?? "We could not send the OTP right now.");
+        return false;
+      }
+
+      setSubmittedName(nextName);
+      setSubmittedPhone(nextPhone);
+      setRequestId(result.requestId);
+      setOtpLength(result.otpLength ?? 4);
+      setResendAvailableAt(result.resendAvailableAt ?? "");
+      setClock(Date.now());
+      setOtp("");
+      setStep("otp");
+      return true;
+    } catch {
+      setErrorMessage("We could not connect to the OTP service. Try again.");
+      return false;
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleSendOtp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = name.trim();
+    const isAlphaName = /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(trimmedName);
     const normalizedPhone = normalizePhoneNumber(phone);
 
-    if (trimmedName.length < 2) {
-      setErrorMessage("Enter your full name to continue.");
+    if (trimmedName.length < 2 || !isAlphaName) {
+      setErrorMessage("Enter a valid full name using alphabets only.");
       return;
     }
 
@@ -100,17 +175,26 @@ export function AuthModal() {
       return;
     }
 
-    setSubmittedName(trimmedName);
-    setSubmittedPhone(normalizedPhone);
-    setOtp("");
-    setErrorMessage("");
-    setStep("otp");
+    await requestOtp(trimmedName, normalizedPhone);
+  };
+
+  const handleResendOtp = async () => {
+    if (!submittedName || !submittedPhone || resendRemainingSeconds > 0) {
+      return;
+    }
+
+    await requestOtp(submittedName, submittedPhone);
   };
 
   const handleVerifyOtp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setIsSubmitting(true);
+    if (!requestId) {
+      setErrorMessage("Please request a new OTP and try again.");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
     setErrorMessage("");
 
     try {
@@ -120,7 +204,7 @@ export function AuthModal() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          name: submittedName,
+          requestId,
           phone: submittedPhone,
           otp: otp.trim()
         })
@@ -134,6 +218,7 @@ export function AuthModal() {
           phone: string;
           email: string;
         };
+        token?: string;
       };
 
       if (!response.ok || !result.user) {
@@ -141,11 +226,11 @@ export function AuthModal() {
         return;
       }
 
-      login(result.user);
+      login(result.user, result.token ?? null);
     } catch {
       setErrorMessage("We could not connect to WooCommerce. Try again.");
     } finally {
-      setIsSubmitting(false);
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -155,20 +240,25 @@ export function AuthModal() {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center">
-      <button type="button" onClick={closeAuth} className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" aria-hidden="true" />
+      <button
+        type="button"
+        onClick={closeAuth}
+        className="absolute inset-0 bg-black/40"
+        aria-hidden="true"
+      />
 
       <section className="surface-panel relative z-10 w-full max-w-md overflow-hidden p-6 shadow-2xl">
         <button
           type="button"
           onClick={closeAuth}
-          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-brand-line bg-white text-slate-600 transition hover:border-brand-green hover:text-brand-green"
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-md border border-brand-line bg-white text-slate-600 transition hover:border-brand-green hover:text-brand-green"
           aria-label="Close authentication modal"
         >
           <X className="h-4 w-4" />
         </button>
 
         <div className="pr-12">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-yellow/90 text-brand-ink">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-brand-yellow/90 text-brand-ink">
             <ShieldCheck className="h-5 w-5" />
           </span>
           <h2 className="mt-4 text-xl font-semibold text-brand-ink">{title}</h2>
@@ -177,7 +267,7 @@ export function AuthModal() {
 
         {user ? (
           <div className="mt-6 space-y-4">
-            <div className="rounded-xl border border-brand-line bg-brand-mint/50 p-4">
+            <div className="rounded-md border border-brand-line bg-brand-mint/50 p-4">
               <p className="text-xs text-slate-500">Signed in as</p>
               <p className="mt-1 text-lg font-bold text-brand-ink">{user.name}</p>
               <p className="mt-1 text-sm font-medium text-slate-600">{formatPhoneNumber(user.phone)}</p>
@@ -188,14 +278,14 @@ export function AuthModal() {
               <button
                 type="button"
                 onClick={closeAuth}
-                className="inline-flex items-center justify-center rounded-lg border border-brand-line px-4 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
+                className="inline-flex items-center justify-center rounded-md border border-brand-line px-4 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
               >
                 Continue shopping
               </button>
               <button
                 type="button"
                 onClick={logout}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
                 <LogOut className="h-4 w-4" />
                 Log out
@@ -209,8 +299,14 @@ export function AuthModal() {
               <input
                 type="text"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                onChange={(event) =>
+                  setName(
+                    event.target.value
+                      .replace(/[^A-Za-z ]/g, "")
+                      .replace(/\s+/g, " ")
+                  )
+                }
+                className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                 placeholder="Enter your full name"
                 autoComplete="name"
               />
@@ -221,34 +317,29 @@ export function AuthModal() {
               <input
                 type="tel"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
+                onChange={(event) => setPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-sm text-brand-ink placeholder:text-slate-400"
                 placeholder="Enter your 10-digit mobile number"
                 autoComplete="tel"
                 inputMode="tel"
               />
             </label>
 
-            <div className="rounded-xl border border-dashed border-brand-line bg-amber-50 px-4 py-3">
-              <p className="text-xs text-slate-500">Master OTP for this build</p>
-              <p className="mt-1 text-base font-bold tracking-[0.2em] text-brand-ink">{masterOtp}</p>
-              <p className="mt-2 text-xs text-slate-500">A WooCommerce customer record will be created or updated after verification.</p>
-            </div>
-
             {errorMessage ? <p className="text-sm font-medium text-red-600">{errorMessage}</p> : null}
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center rounded-lg bg-brand-green px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+              disabled={isSendingOtp}
+              className="inline-flex w-full items-center justify-center rounded-md bg-brand-green px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Send OTP
+              {isSendingOtp ? "Sending OTP..." : "Send OTP"}
             </button>
           </form>
         ) : (
           <form className="mt-6 space-y-4" onSubmit={handleVerifyOtp}>
-            <div className="rounded-xl border border-brand-line bg-brand-mint/50 p-4">
+            <div className="rounded-md border border-brand-line bg-brand-mint/50 p-4">
               <div className="flex items-start gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white text-brand-green">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-white text-brand-green">
                   <UserRound className="h-4 w-4" />
                 </span>
                 <div>
@@ -263,14 +354,26 @@ export function AuthModal() {
               <input
                 type="text"
                 value={otp}
-                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="mt-2 h-12 w-full rounded-lg border border-brand-line bg-white px-4 text-base font-bold tracking-[0.24em] text-brand-ink placeholder:tracking-normal placeholder:text-slate-400"
-                placeholder="Enter 6-digit OTP"
+                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, otpLength))}
+                className="mt-2 h-12 w-full rounded-md border border-brand-line bg-white px-4 text-base font-bold tracking-[0.24em] text-brand-ink placeholder:tracking-normal placeholder:text-slate-400"
+                placeholder={`Enter ${otpLength}-digit OTP`}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                disabled={isSubmitting}
+                disabled={isVerifyingOtp}
               />
             </label>
+
+            <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+              <p>OTP sent to {maskPhoneNumber(submittedPhone)}</p>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={isSendingOtp || isVerifyingOtp || resendRemainingSeconds > 0}
+                className="font-semibold text-brand-green transition hover:text-brand-ink disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {isSendingOtp ? "Sending..." : resendRemainingSeconds > 0 ? `Resend in ${resendRemainingSeconds}s` : "Resend OTP"}
+              </button>
+            </div>
 
             {errorMessage ? <p className="text-sm font-medium text-red-600">{errorMessage}</p> : null}
 
@@ -280,19 +383,21 @@ export function AuthModal() {
                 onClick={() => {
                   setStep("details");
                   setOtp("");
+                  setRequestId("");
+                  setResendAvailableAt("");
                   setErrorMessage("");
                 }}
-                disabled={isSubmitting}
-                className="inline-flex items-center justify-center rounded-lg border border-brand-line px-4 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
+                disabled={isSendingOtp || isVerifyingOtp}
+                className="inline-flex items-center justify-center rounded-md border border-brand-line px-4 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-green hover:text-brand-green"
               >
                 Change details
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="inline-flex items-center justify-center rounded-lg bg-brand-green px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isVerifyingOtp || otp.trim().length !== otpLength}
+                className="inline-flex items-center justify-center rounded-md bg-brand-green px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isSubmitting ? "Saving account..." : "Verify and sign in"}
+                {isVerifyingOtp ? "Verifying..." : "Verify and sign in"}
               </button>
             </div>
           </form>

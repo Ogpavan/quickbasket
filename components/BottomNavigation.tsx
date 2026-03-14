@@ -42,7 +42,7 @@ export function BottomNavigation() {
             <Link
               key={item.label}
               href={item.href}
-              className={cn("flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-slate-500 transition hover:bg-brand-mint hover:text-brand-green")}
+              className={cn("flex flex-col items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-brand-muted transition hover:bg-brand-cream hover:text-brand-ink")}
             >
               <Icon className="h-4 w-4" />
               <span>{item.label}</span>
@@ -53,7 +53,7 @@ export function BottomNavigation() {
         <button
           type="button"
           onClick={focusSearch}
-          className="flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-slate-500 transition hover:bg-brand-mint hover:text-brand-green"
+          className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-brand-muted transition hover:bg-brand-cream hover:text-brand-ink"
         >
           <Search className="h-4 w-4" />
           <span>Search</span>
@@ -62,7 +62,7 @@ export function BottomNavigation() {
         <button
           type="button"
           onClick={openCart}
-          className="relative flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-slate-500 transition hover:bg-brand-mint hover:text-brand-green"
+          className="relative flex flex-col items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-brand-muted transition hover:bg-brand-cream hover:text-brand-ink"
         >
           <ShoppingCart className="h-4 w-4" />
           <span>Cart</span>
@@ -74,7 +74,7 @@ export function BottomNavigation() {
         {user ? (
           <Link
             href="/account/orders"
-            className="flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-brand-green transition hover:bg-brand-mint"
+            className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-cream"
           >
             <User className="h-4 w-4" />
             <span>Orders</span>
@@ -83,7 +83,7 @@ export function BottomNavigation() {
           <button
             type="button"
             onClick={() => openAuth("account")}
-            className="flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-sm font-medium text-slate-500 transition hover:bg-brand-mint hover:text-brand-green"
+            className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-brand-muted transition hover:bg-brand-cream hover:text-brand-ink"
           >
             <User className="h-4 w-4" />
             <span>Account</span>

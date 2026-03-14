@@ -3,7 +3,7 @@ import { Clock3, MapPin, Zap } from "lucide-react";
 export function DeliveryBanner() {
   return (
     <section className="site-container page-section pb-3">
-      <div className="overflow-hidden rounded-xl bg-brand-yellow px-4 py-4 text-brand-ink shadow-card sm:px-5">
+      <div className="overflow-hidden rounded-md bg-brand-yellow px-4 py-4 text-brand-ink shadow-card sm:px-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/70">
             <Zap className="h-5 w-5" />

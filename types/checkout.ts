@@ -1,4 +1,5 @@
 import { CartLineItem } from "@/types/product";
+import { DeliveryFeeConfig } from "@/lib/delivery";
 
 export interface CheckoutCustomerPayload {
   name: string;
@@ -18,6 +19,10 @@ export interface CheckoutAddressPayload {
 export interface CheckoutPayload {
   customer: CheckoutCustomerPayload;
   address: CheckoutAddressPayload;
+  delivery?: {
+    distanceKm?: number;
+    feeConfig?: DeliveryFeeConfig | null;
+  };
   items: CartLineItem[];
   notes?: string;
   couponCode?: string;

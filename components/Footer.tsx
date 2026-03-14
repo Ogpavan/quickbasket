@@ -15,7 +15,7 @@ const footerColumns = [
     title: "Help",
     links: [
       { label: "FAQs", href: "#" },
-      { label: "Delivery areas", href: "#" },
+      { label: "Delivery areas", href: "/delivery-areas" },
       { label: "Order issues", href: "#" },
       { label: "Contact support", href: "#" }
     ]
@@ -80,7 +80,7 @@ export function Footer() {
             <div className="mt-3 grid gap-2">
               <Link
                 href="#"
-                className="inline-flex items-center justify-center rounded-lg px-2 py-1 transition hover:brightness-105"
+                className="inline-flex items-center justify-center rounded-md px-2 py-1 transition hover:brightness-105"
                 aria-label="Get it on Google Play"
               >
                 <Image
@@ -93,7 +93,7 @@ export function Footer() {
               </Link>
               <Link
                 href="#"
-                className="inline-flex items-center justify-center rounded-lg px-2 py-1 transition hover:brightness-105"
+                className="inline-flex items-center justify-center rounded-md px-2 py-1 transition hover:brightness-105"
                 aria-label="Download on the App Store"
               >
                 <Image

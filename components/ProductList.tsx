@@ -67,7 +67,7 @@ export function ProductList({ title, products, viewAllHref, horizontal = false }
           <h2 className="section-title mt-1">{title}</h2>
         </div>
         {viewAllHref ? (
-          <Link href={viewAllHref} className="text-sm font-semibold text-brand-green transition hover:text-brand-ink">
+          <Link href={viewAllHref} className="text-sm font-semibold text-brand-ink transition hover:text-brand-muted">
             View all
           </Link>
         ) : null}
@@ -78,17 +78,19 @@ export function ProductList({ title, products, viewAllHref, horizontal = false }
           <div
             ref={scrollRef}
             onScroll={updateScrollState}
-            className="hide-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+            className="hide-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scroll-smooth sm:mx-0 sm:px-0"
           >
             {visibleProducts.map((product) => (
-              <ProductCard key={product.id} product={product} className="min-w-[180px] max-w-[180px] sm:min-w-[210px]" />
+              <div key={product.id} className="w-[160px] min-w-[160px] snap-start sm:w-[180px] sm:min-w-[180px]">
+                <ProductCard product={product} />
+              </div>
             ))}
           </div>
           <button
             type="button"
             onClick={() => scrollByAmount("left")}
             disabled={!canScrollLeft}
-            className="absolute -left-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-brand-line bg-white/95 text-brand-ink shadow-sm transition hover:border-brand-green hover:text-brand-green disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex lg:-left-4"
+            className="absolute -left-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex lg:-left-4"
             aria-label="Scroll left"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -97,14 +99,14 @@ export function ProductList({ title, products, viewAllHref, horizontal = false }
             type="button"
             onClick={() => scrollByAmount("right")}
             disabled={!canScrollRight}
-            className="absolute -right-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-brand-line bg-white/95 text-brand-ink shadow-sm transition hover:border-brand-green hover:text-brand-green disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex lg:-right-4"
+            className="absolute -right-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex lg:-right-4"
             aria-label="Scroll right"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {visibleProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

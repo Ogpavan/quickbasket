@@ -18,11 +18,11 @@ export function CartItem({ item, compact = false }: CartItemProps) {
   const { removeFromCart, updateQuantity } = useCart();
 
   return (
-    <div className={`rounded-xl border border-brand-line/80 bg-white p-3 shadow-sm ${compact ? "" : "sm:p-5"}`}>
+    <div className={`rounded-md border border-brand-line/80 bg-white p-3 shadow-sm ${compact ? "" : "sm:p-5"}`}>
       <div className={`flex ${compact ? "items-center gap-3" : "flex-col gap-4 sm:flex-row sm:items-center"}`}>
         <Link
           href={`/product/${item.slug}`}
-          className={`relative block overflow-hidden rounded-lg bg-brand-mint ${compact ? "h-20 w-20" : "aspect-square w-full sm:h-28 sm:w-28"}`}
+          className={`relative block overflow-hidden rounded-md bg-brand-mint ${compact ? "h-20 w-20" : "aspect-square w-full sm:h-28 sm:w-28"}`}
         >
           <Image
             src={item.image}
@@ -36,7 +36,9 @@ export function CartItem({ item, compact = false }: CartItemProps) {
         <div className={`flex-1 ${compact ? "" : "sm:ml-2"}`}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{item.brand}</p>
+              {item.brand && item.brand.toLowerCase() !== "quickbasket" ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{item.brand}</p>
+              ) : null}
               <Link href={`/product/${item.slug}`} className="mt-1 block text-sm font-medium text-brand-ink">
                 {item.name}
               </Link>

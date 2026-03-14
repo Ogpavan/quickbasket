@@ -26,7 +26,7 @@ export function QuantityButton({
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-lg border border-brand-line bg-brand-mint p-1 text-brand-ink shadow-sm transition",
+        "inline-flex items-center rounded-md border border-brand-line bg-brand-cream p-1 text-brand-ink shadow-card transition",
         compact ? "gap-0.5" : "gap-1",
         animate ? "animate-cart-bump" : "",
         className
@@ -50,7 +50,7 @@ export function QuantityButton({
         onClick={onIncrease}
         disabled={disabled}
         className={cn(
-          "inline-flex items-center justify-center rounded-md bg-brand-green text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50",
+          "inline-flex items-center justify-center rounded-md bg-brand-yellow text-brand-ink transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50",
           compact ? "h-7 w-7" : "h-9 w-9"
         )}
         aria-label="Increase quantity"

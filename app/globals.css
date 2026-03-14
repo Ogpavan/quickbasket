@@ -4,6 +4,23 @@
 
 :root {
   color-scheme: light;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --color-primary: #f7c600;
+  --color-bg: #ffffff;
+  --color-bg-light: #f7f7f7;
+  --color-text: #111111;
+  --color-muted: #6b6b6b;
+  --color-line: #e6e6e6;
 }
 
 html {
@@ -12,12 +29,12 @@ html {
 
 body {
   min-height: 100vh;
-  background: #ffffff;
-  color: #1b2d1f;
+  background: var(--color-bg-light);
+  color: var(--color-text);
 }
 
 ::selection {
-  background: rgba(255, 213, 74, 0.5);
+  background: rgba(247, 198, 0, 0.45);
 }
 
 @layer base {
@@ -64,16 +81,152 @@ body {
   }
 
   .surface-panel {
-    @apply rounded-xl border border-brand-line/80 bg-white/90 shadow-card backdrop-blur-sm;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-line);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-card);
   }
 }
 
 @layer utilities {
+  .cartbar-backdrop {
+    isolation: isolate;
+  }
+
+  .cartbar-backdrop::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: min(44rem, 92%);
+    height: 64px;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      70% 120% at 50% 100%,
+      rgba(247, 198, 0, 0.45) 0%,
+      rgba(247, 198, 0, 0.25) 35%,
+      rgba(247, 198, 0, 0) 70%
+    );
+    filter: blur(18px);
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .home-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    gap: 12px;
+    text-align: center;
+    color: var(--color-muted);
+  }
+
+  .home-loader__ring {
+    width: 80px;
+    height: 80px;
+    border-radius: 9999px;
+    background: conic-gradient(
+      from 0deg,
+      rgba(247, 198, 0, 0) 0deg,
+      rgba(247, 198, 0, 0.45) 90deg,
+      rgba(247, 198, 0, 0.9) 150deg,
+      rgba(247, 198, 0, 0) 260deg,
+      rgba(247, 198, 0, 0) 360deg
+    );
+    position: relative;
+    animation: home-loader-spin 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .home-loader__ring::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: inherit;
+    background: var(--color-bg);
+  }
+
+  .home-loader__text {
+    font-size: 0.95rem;
+  }
+
+  @keyframes home-loader-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .cartbar-fly {
+    position: fixed;
+    border-radius: 9999px;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 6px 16px rgba(17, 17, 17, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.9);
+    transform: translate(-50%, -50%);
+    animation: cartbar-fly 720ms cubic-bezier(0.22, 0.7, 0.24, 1) forwards;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  @keyframes cartbar-fly {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    70% {
+      transform: translate(calc(-50% + var(--fly-x)), calc(-50% + var(--fly-y))) scale(0.6);
+      opacity: 0.85;
+    }
+    100% {
+      transform: translate(calc(-50% + var(--fly-x)), calc(-50% + var(--fly-y))) scale(0.25);
+      opacity: 0;
+    }
+  }
+
   .hide-scrollbar {
     scrollbar-width: none;
   }
 
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  .native-scrollbar {
+    scrollbar-gutter: stable both-edges;
+  }
+
+  .places-autocomplete,
+  .places-autocomplete gmp-place-autocomplete {
+    color-scheme: light;
+  }
+
+  .places-autocomplete,
+  .places-autocomplete * {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .places-autocomplete gmp-place-autocomplete {
+    border-radius: 0.75rem;
+    background: transparent;
+    border: 1px solid #f7c600;
+  }
+
+  .places-autocomplete gmp-place-autocomplete:focus-within {
+    border-color: #e0b300;
+    box-shadow: 0 0 0 2px rgba(247, 198, 0, 0.25);
+  }
+
+  .places-autocomplete gmp-place-autocomplete::part(input),
+  .places-autocomplete gmp-place-autocomplete::part(text-field) {
+    border: none;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
   }
 }

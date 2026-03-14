@@ -1,3 +1,5 @@
+﻿"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -23,7 +25,7 @@ export function OfferBanner({ offers }: OfferBannerProps) {
           <Link
             key={offer.title}
             href={offer.href}
-            className="group relative h-44 snap-center overflow-hidden rounded-xl border border-brand-line bg-white shadow-card sm:h-52 lg:h-56"
+            className="group relative h-44 snap-center overflow-hidden rounded-lg border border-brand-line bg-white shadow-card transition duration-150 hover:-translate-y-0.5 sm:h-52 lg:h-56"
             aria-label={offer.title}
           >
             <Image
