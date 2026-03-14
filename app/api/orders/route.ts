@@ -5,7 +5,8 @@ import {
   fetchWooOrdersForCustomerWithItems,
   fetchWooOrdersPageWithItems,
   fetchWooOrdersWithItems,
-  findWooCustomerByEmail
+  findWooCustomerByEmail,
+  type WooOrderWithItems
 } from "@/lib/woocommerce";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +36,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let orders = [];
+    let orders: WooOrderWithItems[] = [];
     if (customerId) {
       orders = await fetchWooOrdersForCustomerWithItems(customerId);
     } else if (normalizedPhone || normalizedEmail) {
       const perPage = 100;
       const maxPages = 5;
-      const matchedOrders = [];
+      const matchedOrders: WooOrderWithItems[] = [];
 
       for (let page = 1; page <= maxPages; page += 1) {
         const pageOrders = page === 1 ? await fetchWooOrdersWithItems(perPage) : await fetchWooOrdersPageWithItems({ page, perPage });
