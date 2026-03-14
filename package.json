@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@headlessui/react": "^2.1.8",
+    "@headlessui/react": "^2.2.9",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.454.0",
     "mysql2": "^3.19.1",

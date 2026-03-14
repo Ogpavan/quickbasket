@@ -808,7 +808,7 @@ export function CartDrawer() {
               ) : null}
               <button
                 type="button"
-                onClick={handleOpenAddressModal}
+                onClick={() => handleOpenAddressModal()}
                 className="inline-flex w-full items-center justify-center rounded-md border border-brand-line bg-white px-4 py-3 text-sm font-semibold text-brand-ink transition hover:border-brand-yellow"
               >
                 + Add new address
