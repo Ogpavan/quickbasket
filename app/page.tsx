@@ -68,11 +68,15 @@ export default function HomePage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((key) => (
-            <div key={key} className="rounded-md border border-brand-line bg-white p-4 shadow-card animate-pulse">
+            <div key={key} className="rounded-md border border-brand-line bg-white p-4 shadow-card animate-pulse space-y-4">
               <div className="h-5 w-24 rounded bg-slate-200" />
-              <div className="mt-4 grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {[...Array(4)].map((_, idx) => (
-                  <div key={idx} className="aspect-[3/4] w-full rounded bg-slate-100" />
+                  <div key={idx} className="rounded-md border border-brand-line bg-slate-100 p-3">
+                    <div className="aspect-square w-full rounded bg-slate-200" />
+                    <div className="mt-3 h-3 w-3/4 rounded bg-slate-200" />
+                    <div className="mt-2 h-3 w-1/2 rounded bg-slate-200" />
+                  </div>
                 ))}
               </div>
             </div>
