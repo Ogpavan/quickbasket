@@ -143,7 +143,6 @@ export function Header() {
     }
 
     hasAutoDetectedRef.current = true;
-    setIsLocationOpen(true);
     loadGoogleScript()
       .then(() => setIsPlacesReady(true))
       .catch(() => setIsPlacesReady(false));
