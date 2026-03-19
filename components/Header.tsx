@@ -4,7 +4,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, MapPin, Search, ShoppingCart, UserRound } from "lucide-react";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { AddressCard, AddressCardData } from "@/components/AddressCard";
 import { SearchBar } from "@/components/SearchBar";
@@ -58,16 +58,19 @@ export function Header() {
     }, 180);
   };
 
-  const handleSearchSuggestions = ({
-    loading,
-    suggestions
-  }: {
-    loading: boolean;
-    suggestions: GroceryProduct[];
-  }) => {
-    setSearchLoading(loading);
-    setSearchResults(suggestions);
-  };
+  const handleSearchSuggestions = useCallback(
+    ({
+      loading,
+      suggestions
+    }: {
+      loading: boolean;
+      suggestions: GroceryProduct[];
+    }) => {
+      setSearchLoading(loading);
+      setSearchResults(suggestions);
+    },
+    []
+  );
 
   const openSearchOverlay = () => {
     setIsLocationOpen(false);
