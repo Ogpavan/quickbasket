@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, MapPin, ShoppingCart, UserRound } from "lucide-react";
+import { ChevronDown, MapPin, Search, ShoppingCart, UserRound } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { AddressCard, AddressCardData } from "@/components/AddressCard";
@@ -66,6 +66,20 @@ export function Header() {
   }) => {
     setSearchLoading(loading);
     setSearchResults(suggestions);
+  };
+
+  const openSearchOverlay = () => {
+    setIsLocationOpen(false);
+    setIsAccountOpen(false);
+    setIsSearchFocused(true);
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.setTimeout(() => {
+      const desktopInput = document.getElementById("global-grocery-search") as HTMLInputElement | null;
+      const mobileInput = document.getElementById("global-grocery-search-mobile") as HTMLInputElement | null;
+      (desktopInput ?? mobileInput)?.focus();
+    }, 0);
   };
 
   const loadGoogleScript = () => {
@@ -490,7 +504,7 @@ export function Header() {
       <header className="sticky top-0 z-50 border-b border-brand-line bg-white/95 backdrop-blur">
         <div className="site-container py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
               <Link href="/" className="flex items-center gap-2">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-yellow text-lg font-bold text-brand-ink">
                   Q
@@ -500,11 +514,50 @@ export function Header() {
                   <p className="text-xs text-brand-muted">groceries in minutes</p>
                 </div>
               </Link>
+              <div className="flex items-center gap-2 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={openSearchOverlay}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow/70"
+                    aria-label="Open search"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                <button
+                  type="button"
+                  onClick={openCart}
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-yellow text-brand-ink shadow-card transition hover:brightness-95"
+                  aria-label="Open cart drawer"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-ink px-1 text-[10px] font-bold text-white">
+                    {itemCount}
+                  </span>
+                </button>
+                {user ? (
+                  <Link
+                    href="/account/orders"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-brand-line bg-white text-brand-ink shadow-card transition hover:border-brand-yellow/70"
+                    aria-label="Open profile"
+                  >
+                    <UserRound className="h-4 w-4 text-brand-ink" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAuth("account")}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-brand-line bg-white text-brand-muted shadow-card transition hover:border-brand-yellow/70"
+                    aria-label="Sign in"
+                  >
+                    <UserRound className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {!isSearchFocused && (
-              <div className="w-full lg:w-auto">
-                <div className="relative" ref={locationRef}>
+              <div className="w-full lg:w-auto flex justify-center">
+                <div className="relative w-full max-w-xl" ref={locationRef}>
                   <button
                     type="button"
                     onClick={() => {
@@ -515,19 +568,16 @@ export function Header() {
                     aria-label="Delivery location"
                     aria-expanded={isLocationOpen}
                   >
-                    <span className="inline-flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-brand-ink" />
-                      <span className="hidden sm:block">
-                        <span className="text-[10px] text-brand-muted">Delivering to</span>
-                        <span className="block max-w-[160px] truncate text-xs font-medium leading-tight text-brand-ink">
+                    <span className="inline-flex w-full items-center gap-2">
+                      <MapPin className="h-4 w-4 flex-shrink-0 text-brand-ink" />
+                      <span className="flex-1 overflow-hidden text-left leading-tight">
+                        <span className="block text-[10px] text-brand-muted sm:hidden">Delivering to</span>
+                        <span className="block text-xs font-medium leading-tight text-brand-ink truncate sm:max-w-[180px]">
                           {locationLabel}
                         </span>
                       </span>
-                      <span className="max-w-[140px] truncate text-xs font-medium text-brand-ink sm:hidden">
-                        {locationLabel}
-                      </span>
+                      <ChevronDown className="h-4 w-4 flex-shrink-0 text-brand-muted" />
                     </span>
-                    <ChevronDown className="h-4 w-4 text-brand-muted" />
                   </button>
                   {serviceStatus === "unserviceable" ? (
                     <p className="mt-1 text-xs text-rose-500">Service unavailable in your location</p>
@@ -598,7 +648,7 @@ export function Header() {
               </div>
             )}
 
-          <div className="flex w-full items-center gap-3 lg:flex-1">
+          <div className="hidden w-full items-center gap-3 lg:flex lg:flex-1">
             <div
               className={cn(
                 "flex-1 min-w-0 transition-all duration-300 ease-out",
@@ -615,7 +665,7 @@ export function Header() {
                   className={isSearchFocused ? "lg:min-w-full" : ""}
                 />
               </div>
-              <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+              <div className="hidden shrink-0 items-center gap-2 lg:ml-auto lg:flex">
                 {!isSearchFocused && (
                   user ? (
                     <div className="relative" ref={accountRef}>
@@ -704,6 +754,16 @@ export function Header() {
       {isSearchFocused && (
         <div className="fixed inset-x-0 top-[72px] bottom-0 z-40 bg-white pt-8">
           <div className="site-container flex flex-col gap-6">
+            <div className="lg:hidden">
+              <SearchBar
+                compact
+                inputId="global-grocery-search-mobile"
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+                disableDropdown
+                onSuggestionsChange={handleSearchSuggestions}
+              />
+            </div>
             <div className="min-h-[220px]">
               {searchLoading ? (
                 <div className="rounded-2xl border border-brand-line/70 bg-slate-50 p-6 text-sm text-slate-500 shadow-sm">

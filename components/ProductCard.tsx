@@ -54,7 +54,7 @@ function ProductCardBase({ product, className }: ProductCardProps) {
   return (
     <article
       className={cn(
-        "group flex h-full min-h-[248px] flex-col overflow-hidden rounded-sm border border-brand-line bg-white p-3 shadow-card transition duration-150 hover:-translate-y-0.5 hover:shadow-float",
+        "group flex h-full min-h-[220px] flex-col overflow-hidden rounded-sm border border-brand-line bg-white p-2.5 shadow-card transition duration-150 hover:-translate-y-0.5 hover:shadow-float sm:min-h-[248px] sm:p-3",
         className
       )}
     >

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAuthToken } from "@/lib/server/auth";
 import { OtpServiceError, verifyOtpChallenge } from "@/lib/server/otp";
+import { syncWordPressCustomerProfile } from "@/lib/server/wordpress-users";
 import { upsertWooCustomer } from "@/lib/woocommerce";
 
 export const dynamic = "force-dynamic";
@@ -65,11 +66,22 @@ export async function POST(request: NextRequest) {
       phone: verifiedChallenge.phone
     });
 
+    const resolvedName = resolveDisplayName(customer.first_name, customer.last_name, verifiedChallenge.name);
+    const resolvedPhone = customer.billing?.phone ?? verifiedChallenge.phone;
+    const resolvedEmail = customer.email?.trim() || `${resolvedPhone}@quickbasket.local`;
+
+    await syncWordPressCustomerProfile({
+      userId: customer.id,
+      name: resolvedName,
+      phone: resolvedPhone,
+      email: resolvedEmail
+    });
+
     const user = {
       id: customer.id,
-      name: resolveDisplayName(customer.first_name, customer.last_name, verifiedChallenge.name),
-      phone: customer.billing?.phone ?? verifiedChallenge.phone,
-      email: customer.email
+      name: resolvedName,
+      phone: resolvedPhone,
+      email: resolvedEmail
     };
 
     return NextResponse.json({

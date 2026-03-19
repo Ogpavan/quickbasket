@@ -7,9 +7,11 @@ import { CartBar } from "@/components/CartBar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { DeliveryProvider } from "@/context/DeliveryContext";
+import { headers } from "next/headers";
 
 import "./globals.css";
 
@@ -31,11 +33,29 @@ export const metadata: Metadata = {
   description: "Quick-commerce grocery storefront for fast browsing, instant carting, and speedy delivery."
 };
 
+const WEBVIEW_INDICATORS = [
+  "webview",
+  "wv/",
+  "quickbasketapp",
+  "quickbasket",
+  "qnapp"
+];
+
+function isAppWebView(userAgent: string | null) {
+  if (!userAgent) {
+    return false;
+  }
+  const normalized = userAgent.toLowerCase();
+  return WEBVIEW_INDICATORS.some((indicator) => normalized.includes(indicator));
+}
+
 export default function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const userAgent = headers().get("user-agent");
+  const hideFooter = isAppWebView(userAgent);
   return (
     <html lang="en">
       <body className={`${inter.variable} ${poppins.variable} font-sans bg-white`}>
@@ -46,7 +66,8 @@ export default function RootLayout({
                 <Header />
                 <main className="pb-28 lg:pb-6">{children}</main>
                 <CartBar />
-                <Footer />
+                {!hideFooter && <Footer />}
+                <RoutePrefetcher />
                 <CartDrawer />
                 <AuthModal />
                 <BottomNavigation />

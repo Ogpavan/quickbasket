@@ -26,8 +26,8 @@ export function CategorySidebar({ items, activeSlug, orientation = "vertical" }:
     <nav
         className={cn(
           isHorizontal
-          ? "flex gap-1.5 overflow-x-auto py-1"
-          : "native-scrollbar sticky top-0 flex h-full w-[90px] flex-col gap-1.5 overflow-y-scroll border-r border-brand-line bg-white px-2 py-3"
+        ? "flex gap-1.5 overflow-x-auto py-1"
+        : "native-scrollbar sticky top-0 flex h-full w-[90px] flex-col gap-1.5 overflow-y-scroll border-r border-brand-line bg-white px-0.5 lg:px-2 py-3"
         )}
       aria-label="Categories"
     >

@@ -61,7 +61,7 @@ export function CartBar() {
   }
 
   return (
-    <div className="cartbar-backdrop fixed inset-x-0 bottom-16 z-40 px-4 sm:px-6 lg:bottom-4">
+    <div className="cartbar-backdrop fixed inset-x-0 bottom-16 z-40 px-4 sm:px-6 lg:bottom-4 pb-4 lg:pb-0">
       {targetPoint && flyItems.length > 0 ? (
         <div className="pointer-events-none fixed inset-0 z-50">
           {flyItems.map((item) => {

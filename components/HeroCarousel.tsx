@@ -99,9 +99,10 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 <Image
                   src={slide.image}
                   alt={slide.title}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 80vw"
-                  className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                  width={1200}
+                  height={600}
+                  sizes="100vw"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                   priority={index === 0}
                 />
               </Link>

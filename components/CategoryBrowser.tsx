@@ -111,9 +111,11 @@ export function CategoryBrowser({
   return (
     <section className="page-section space-y-5">
       <div className="site-container">
-        <div className="flex h-[80vh] gap-4 overflow-hidden">
-          <div className="h-full shrink-0 overflow-y-auto">
-            <CategorySidebar items={railCategories} activeSlug={category.slug} />
+        <div className="flex gap-4 lg:h-[80vh]">
+          <div className="relative h-auto shrink-0 lg:w-[90px]">
+            <div className="sticky top-20 h-[calc(100vh-80px)] overflow-y-auto">
+              <CategorySidebar items={railCategories} activeSlug={category.slug} />
+            </div>
           </div>
 
           <div className="min-w-0 flex-1 space-y-6 overflow-y-auto pr-1">
@@ -124,7 +126,7 @@ export function CategoryBrowser({
               </div>
             ) : (
               <section>
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                   {items.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}

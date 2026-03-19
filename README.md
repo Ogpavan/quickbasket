@@ -56,7 +56,7 @@ The single WooCommerce products request is reused across the app:
 
 - Method: `POST`
 - Endpoint: `/api/auth/verify-otp`
-- Purpose: verifies the submitted OTP against the WordPress-backed OTP tables and syncs the signed-in user into WooCommerce as a customer
+- Purpose: verifies the submitted OTP against the WordPress-backed OTP tables, syncs the signed-in user into WooCommerce as a customer, and updates the WordPress core user profile tables
 - Source file: `app/api/auth/verify-otp/route.ts`
 
 ### 3. WooCommerce Customers API
@@ -133,6 +133,7 @@ Files: `app/api/auth/send-otp/route.ts`, `app/api/auth/verify-otp/route.ts`, `li
 - Sends the real OTP through the configured SMS gateway
 - Generates a placeholder email in the format `{phone}@quickbasket.local`
 - Creates or updates the WooCommerce customer
+- Synchronizes the same customer profile into WordPress core tables (`wp_users` and `wp_usermeta`)
 - Returns the stored customer payload back to the frontend auth context
 
 ### Checkout write layer

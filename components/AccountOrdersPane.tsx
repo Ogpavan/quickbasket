@@ -1,81 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { CalendarCheck, PackageCheck, WalletCards } from "lucide-react";
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
-
-interface AccountOrder {
-  id: number;
-  status: string;
-  total: string;
-  payment_method: string;
-  payment_method_title?: string;
-  date_created: string;
-  date_paid?: string | null;
-  date_completed?: string | null;
-  discount_total?: string;
-  shipping_total?: string;
-  total_tax?: string;
-  currency?: string;
-  billing?: {
-    first_name?: string;
-    last_name?: string;
-    address_1?: string;
-    address_2?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-  shipping?: {
-    first_name?: string;
-    last_name?: string;
-    address_1?: string;
-    address_2?: string;
-    city?: string;
-    state?: string;
-    postcode?: string;
-    country?: string;
-  };
-  line_items?: Array<{
-    id: number;
-    product_id: number;
-    name: string;
-    quantity: number;
-    total: string;
-    subtotal?: string;
-    price?: number;
-    image?: string;
-  }>;
-}
+import { loadAccountOrders } from "@/lib/api/account-orders";
+import { getStatusStyles } from "@/lib/order-utils";
+import type { AccountOrder } from "@/types/order";
 
 const FALLBACK_THUMBNAIL =
   "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80";
 
-function getStatusStyles(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized === "cancelled" || normalized === "canceled") {
-    return "bg-rose-50 text-rose-600 border-rose-200";
-  }
-  if (normalized === "processing" || normalized === "on-hold") {
-    return "bg-amber-50 text-amber-700 border-amber-200";
-  }
-  if (normalized === "completed" || normalized === "delivered") {
-    return "bg-emerald-50 text-emerald-600 border-emerald-200";
-  }
-  return "bg-slate-50 text-slate-600 border-slate-200";
-}
-
 export function AccountOrdersPane() {
   const { user, openAuth, logout } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState<AccountOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
   const heading = useMemo(() => {
     if (!orders.length) {
@@ -85,31 +29,31 @@ export function AccountOrdersPane() {
   }, [orders.length]);
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!user?.id && !user?.phone) {
       setOrders([]);
       return;
     }
 
+    const controller = new AbortController();
     setLoading(true);
     setError("");
 
-    const query = user.phone ? `phone=${encodeURIComponent(user.phone)}` : `customerId=${user.id ?? ""}`;
-    fetch(`/api/orders?${query}`)
-      .then((response) => response.json())
+    loadAccountOrders({ user, signal: controller.signal })
       .then((result) => {
-        if (result.orders) {
-          setOrders(result.orders);
-          return;
-        }
-        throw new Error(result.error ?? "Unable to load orders");
+        setOrders(result);
       })
       .catch((fetchError) => {
+        if ((fetchError as Error).name === "AbortError") {
+          return;
+        }
         console.error("Account orders fetch failed", fetchError);
         setError("Could not load your orders.");
       })
       .finally(() => {
         setLoading(false);
       });
+
+    return () => controller.abort();
   }, [user]);
 
   if (!user) {
@@ -162,46 +106,20 @@ export function AccountOrdersPane() {
         <div className="space-y-3">
           {orders.map((order) => {
             const dateLabel = format(new Date(order.date_created), "MMM d, yyyy");
-            const placedLabel = format(new Date(order.date_created), "EEE, dd MMM''yy, h:mm a");
             const thumbnails = (order.line_items ?? []).slice(0, 5);
-            const itemCount = (order.line_items ?? []).reduce((sum, item) => sum + (item.quantity || 0), 0);
-            const itemSubtotal = (order.line_items ?? []).reduce(
-              (sum, item) => sum + Number(item.subtotal ?? item.total ?? 0),
-              0
-            );
-            const itemTotal = (order.line_items ?? []).reduce((sum, item) => sum + Number(item.total ?? 0), 0);
-            const discount = Math.max(itemSubtotal - itemTotal, 0);
-            const shippingTotal = Number(order.shipping_total ?? 0);
-            const handlingCharge = 0;
-            const billTotal = Number(order.total ?? itemTotal + shippingTotal);
-            const addressSource = order.shipping?.address_1 ? order.shipping : order.billing;
-            const addressLine = addressSource
-              ? [
-                  `${addressSource.first_name ?? ""} ${addressSource.last_name ?? ""}`.trim(),
-                  addressSource.address_1,
-                  addressSource.address_2,
-                  addressSource.city
-                ]
-                  .filter(Boolean)
-                  .join(", ")
-              : "Saved address";
-            const arrivedAt =
-              order.date_completed || order.date_paid || (order.status.toLowerCase() === "completed" ? order.date_created : "");
-
             const statusStyles = getStatusStyles(order.status);
-            const isExpanded = expandedOrderId === order.id;
 
             return (
               <article
                 key={order.id}
-                className="rounded-md border border-brand-line bg-white p-3 shadow-sm transition hover:border-brand-yellow/70"
-                role="button"
+                className="rounded-md border border-brand-line bg-white p-3 shadow-sm transition hover:border-brand-yellow/70 focus-within:border-brand-green focus-within:outline-none"
+                role="link"
                 tabIndex={0}
-                onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                onClick={() => router.push(`/account/orders/${order.id}`)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setExpandedOrderId(isExpanded ? null : order.id);
+                    router.push(`/account/orders/${order.id}`);
                   }
                 }}
               >
@@ -215,7 +133,7 @@ export function AccountOrdersPane() {
                           alt={item.name}
                           width={40}
                           height={40}
-                          className="h-9 w-9 rounded-full border border-white object-cover shadow-sm"
+                          className="h-9 w-9 rounded-full border border-white object-cover shadow-sm transition"
                           sizes="40px"
                         />
                       ))}
@@ -237,83 +155,6 @@ export function AccountOrdersPane() {
                   <span>Payment: {order.payment_method.toUpperCase()}</span>
                   <span className="text-base font-semibold text-brand-ink">₹{order.total}</span>
                 </div>
-                {isExpanded ? (
-                  <div className="mt-3 space-y-4 rounded-md border border-brand-line bg-brand-cream/60 p-3 text-sm text-brand-ink">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-muted">Order summary</p>
-                      {arrivedAt ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Arrived at {format(new Date(arrivedAt), "h:mm a")}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 text-xs text-slate-500">{itemCount} item{itemCount === 1 ? "" : "s"} in this order</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      {(order.line_items ?? []).map((item) => (
-                        <div key={item.id} className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium text-brand-ink">{item.name}</p>
-                            <p className="text-xs text-slate-500">
-                              1 pc x {item.quantity}
-                            </p>
-                          </div>
-                          <p className="text-sm font-semibold text-brand-ink">₹{item.total}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-muted">Bill details</p>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>MRP</span>
-                        <span>₹{itemSubtotal.toFixed(0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>Product discount</span>
-                        <span className="text-emerald-600">-₹{discount.toFixed(0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>Item total</span>
-                        <span>₹{itemTotal.toFixed(0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>Handling charge</span>
-                        <span>{handlingCharge > 0 ? `+₹${handlingCharge}` : "FREE"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>Delivery charges</span>
-                        <span>{shippingTotal > 0 ? `₹${shippingTotal.toFixed(0)}` : "FREE"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm font-semibold text-brand-ink">
-                        <span>Bill total</span>
-                        <span>₹{billTotal.toFixed(0)}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-muted">Order details</p>
-                      <div className="flex items-start justify-between gap-3 text-xs text-slate-600">
-                        <span>Order id</span>
-                        <span className="text-right text-brand-ink">{order.id}</span>
-                      </div>
-                      <div className="flex items-start justify-between gap-3 text-xs text-slate-600">
-                        <span>Payment</span>
-                        <span className="text-right text-brand-ink">
-                          {order.payment_method_title ? order.payment_method_title : `Paid via ${order.payment_method.toUpperCase()}`}
-                        </span>
-                      </div>
-                      <div className="flex items-start justify-between gap-3 text-xs text-slate-600">
-                        <span>Deliver to</span>
-                        <span className="text-right text-brand-ink">{addressLine}</span>
-                      </div>
-                      <div className="flex items-start justify-between gap-3 text-xs text-slate-600">
-                        <span>Order placed</span>
-                        <span className="text-right text-brand-ink">Placed on {placedLabel}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
               </article>
             );
           })}
