@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";

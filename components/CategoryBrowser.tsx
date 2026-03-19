@@ -131,9 +131,7 @@ export function CategoryBrowser({
                     <ProductCard key={product.id} product={product} />
                   ))}
 
-                  {isLoading
-                    ? Array.from({ length: 6 }).map((_, index) => <ProductCardSkeleton key={`loading-${index}`} />)
-                    : null}
+                  {isLoading ? <ProductCardSkeleton /> : null}
                 </div>
               </section>
             )}
