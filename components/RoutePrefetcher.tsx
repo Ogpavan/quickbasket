@@ -18,11 +18,15 @@ export function RoutePrefetcher() {
 
   useEffect(() => {
     PREFETCH_ROUTES.forEach((route) => {
-      const promise = router.prefetch(route);
-      if (promise && typeof promise.catch === "function") {
-        promise.catch(() => {
-          // Ignore failures for prefetching.
-        });
+      try {
+        const maybePromise = router.prefetch(route);
+        if (maybePromise instanceof Promise) {
+          maybePromise.catch(() => {
+            // Ignore failures for prefetching.
+          });
+        }
+      } catch {
+        // Ignore prefetch failures.
       }
     });
   }, [router]);

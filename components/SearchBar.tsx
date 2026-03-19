@@ -93,7 +93,7 @@ export function SearchBar({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, onSuggestionsChange]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
