@@ -451,6 +451,7 @@ export function Header() {
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
       setGeoStatus("error");
+      setIsLocationOpen(false);
       return;
     }
 
@@ -488,6 +489,7 @@ export function Header() {
       },
       () => {
         setGeoStatus("error");
+        setIsLocationOpen(false);
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
     );
