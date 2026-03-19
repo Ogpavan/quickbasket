@@ -19,9 +19,9 @@ export function RoutePrefetcher() {
   useEffect(() => {
     PREFETCH_ROUTES.forEach((route) => {
       try {
-        const maybePromise = router.prefetch(route);
-        if (typeof maybePromise?.then === "function") {
-          maybePromise.catch(() => {
+        const maybePromise: any = router.prefetch(route);
+        if (maybePromise && typeof maybePromise.then === "function") {
+          (maybePromise as Promise<unknown>).catch(() => {
             // Ignore failures for prefetching.
           });
         }
