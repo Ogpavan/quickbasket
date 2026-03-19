@@ -20,7 +20,7 @@ export function RoutePrefetcher() {
     PREFETCH_ROUTES.forEach((route) => {
       try {
         const maybePromise = router.prefetch(route);
-        if (maybePromise instanceof Promise) {
+        if (typeof maybePromise?.then === "function") {
           maybePromise.catch(() => {
             // Ignore failures for prefetching.
           });
