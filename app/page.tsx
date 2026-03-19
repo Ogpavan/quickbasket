@@ -27,7 +27,7 @@ export default function HomePage() {
   useEffect(() => {
     let isActive = true;
 
-    fetch("/api/home", { cache: "no-store" })
+    fetch("/api/home")
       .then(async (response) => {
         const result = (await response.json()) as HomePayload & { error?: string };
         if (!response.ok) {
@@ -61,10 +61,22 @@ export default function HomePage() {
 
   if (!data && !error) {
     return (
-      <section className="site-container page-section">
-        <div className="home-loader">
-          <div className="home-loader__ring" />
-          <p className="home-loader__text">Loading the homepage…</p>
+      <section className="site-container page-section space-y-6">
+        <div className="rounded-md border border-brand-line bg-white p-4 shadow-card animate-pulse">
+          <div className="h-8 w-32 rounded bg-slate-200" />
+          <div className="mt-4 h-48 w-full rounded bg-slate-100" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="rounded-md border border-brand-line bg-white p-4 shadow-card animate-pulse">
+              <div className="h-5 w-24 rounded bg-slate-200" />
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                {[...Array(4)].map((_, idx) => (
+                  <div key={idx} className="aspect-[3/4] w-full rounded bg-slate-100" />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     );
