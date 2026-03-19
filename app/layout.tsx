@@ -5,7 +5,7 @@ import { AuthModal } from "@/components/AuthModal";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { CartBar } from "@/components/CartBar";
 import { CartDrawer } from "@/components/CartDrawer";
-import { Footer } from "@/components/Footer";
+import { FooterGate } from "@/components/FooterGate";
 import { Header } from "@/components/Header";
 import { RoutePrefetcher } from "@/components/RoutePrefetcher";
 import { AuthProvider } from "@/context/AuthContext";
@@ -66,7 +66,7 @@ export default function RootLayout({
                 <Header />
                 <main className="pb-28 lg:pb-6">{children}</main>
                 <CartBar />
-                {!hideFooter && <Footer />}
+                <FooterGate serverHide={hideFooter} />
                 <RoutePrefetcher />
                 <CartDrawer />
                 <AuthModal />
