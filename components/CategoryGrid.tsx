@@ -30,7 +30,7 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
                     width={240}
                     height={352}
                     sizes="(max-width: 640px) 70vw, (max-width: 1024px) 25vw, 12vw"
-                    className="w-auto object-fill transition duration-500 group-hover:scale-105"
+                    className="h-auto w-full object-contain transition duration-500 group-hover:scale-105"
                   />
                 </div>
           </Link>
